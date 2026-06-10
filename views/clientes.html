@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Clientes</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell deliveries-page" data-clients-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Base comercial ativa</span>
+            <h1>Clientes operacionais</h1>
+            <p>Organize contatos, localizacao e disponibilidade da carteira atendida.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-client-message></div>
+        <section class="module-summary-grid" data-client-summary></section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Cadastro comercial</span>
+                <h2 data-form-title>Novo cliente</h2>
+              </div>
+              <button class="button ghost" type="button" data-new-client-button>
+                Novo cliente
+              </button>
+            </div>
+
+            <form class="grid-form two-columns" data-client-form>
+              <input type="hidden" name="id" />
+
+              <div class="field">
+                <label for="clientNome">Nome</label>
+                <input id="clientNome" name="nome" maxlength="150" required />
+              </div>
+
+              <div class="field">
+                <label for="clientDocumento">Documento</label>
+                <input id="clientDocumento" name="documento" maxlength="18" required />
+              </div>
+
+              <div class="field">
+                <label for="clientEmail">Email</label>
+                <input id="clientEmail" name="email" type="email" maxlength="255" required />
+              </div>
+
+              <div class="field">
+                <label for="clientTelefone">Telefone</label>
+                <input id="clientTelefone" name="telefone" maxlength="20" required />
+              </div>
+
+              <div class="field">
+                <label for="clientContatoNome">Contato principal</label>
+                <input id="clientContatoNome" name="contatoNome" maxlength="150" required />
+              </div>
+
+              <div class="field">
+                <label for="clientStatus">Status</label>
+                <select id="clientStatus" name="status" required>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="bloqueado">Bloqueado</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="clientCidade">Cidade</label>
+                <input id="clientCidade" name="cidade" maxlength="120" required />
+              </div>
+
+              <div class="field">
+                <label for="clientEstado">Estado</label>
+                <input id="clientEstado" name="estado" maxlength="2" required />
+              </div>
+
+              <div class="field full">
+                <label for="clientEndereco">Endereco</label>
+                <input id="clientEndereco" name="endereco" maxlength="255" required />
+              </div>
+
+              <div class="field full">
+                <label for="clientObservacoes">Observacoes</label>
+                <textarea
+                  id="clientObservacoes"
+                  name="observacoes"
+                  rows="4"
+                  maxlength="2000"
+                ></textarea>
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-submit-button>
+                  Salvar cliente
+                </button>
+                <button class="button ghost" type="button" data-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Visualizacao</span>
+                <h2>Detalhes do cliente</h2>
+              </div>
+            </div>
+
+            <div class="delivery-details empty" data-client-details>
+              Selecione um cliente para visualizar os detalhes comerciais.
+            </div>
+
+            <form class="status-update-form" data-client-status-form>
+              <div class="field">
+                <label for="clientStatusRapido">Atualizar status</label>
+                <select id="clientStatusRapido" name="status">
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="bloqueado">Bloqueado</option>
+                </select>
+              </div>
+              <button class="button ghost" type="submit">Atualizar status</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Carteira ativa</span>
+              <h2>Clientes cadastrados</h2>
+            </div>
+            <button class="button ghost" type="button" data-refresh-button>Atualizar lista</button>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Documento</th>
+                  <th>Contato</th>
+                  <th>Email</th>
+                  <th>Cidade/UF</th>
+                  <th>Status</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-clients-table-body>
+                <tr><td colspan="7">Carregando clientes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/clients.js"></script>
+  </body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Financeiro</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell deliveries-page" data-financial-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Financeiro operacional</span>
+            <h1>Controle de faturamento e pendencias</h1>
+            <p>Conecte clientes, entregas e lancamentos com acompanhamento de status e vencimento.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-financial-message></div>
+        <section class="module-summary-grid" data-financial-summary></section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Filtros operacionais</span>
+              <h2>Refinar lancamentos</h2>
+            </div>
+            <button class="button ghost" type="button" data-financial-refresh-button>
+              Atualizar lista
+            </button>
+          </div>
+
+          <form class="grid-form two-columns" data-financial-filter-form>
+            <div class="field">
+              <label for="financialFilterStatus">Status</label>
+              <select id="financialFilterStatus" name="status">
+                <option value="">Todos</option>
+                <option value="pendente">Pendente</option>
+                <option value="faturado">Faturado</option>
+                <option value="pago">Pago</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="financialFilterTipo">Tipo</label>
+              <select id="financialFilterTipo" name="tipo">
+                <option value="">Todos</option>
+                <option value="receita">Receita</option>
+                <option value="despesa">Despesa</option>
+                <option value="repasse">Repasse</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="financialFilterCliente">Cliente</label>
+              <select id="financialFilterCliente" name="clienteId">
+                <option value="">Todos os clientes</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="financialFilterInicio">Data inicial</label>
+              <input id="financialFilterInicio" name="dataInicio" type="date" />
+            </div>
+
+            <div class="field">
+              <label for="financialFilterFim">Data final</label>
+              <input id="financialFilterFim" name="dataFim" type="date" />
+            </div>
+
+            <div class="actions field full">
+              <button class="button primary" type="submit">Aplicar filtros</button>
+              <button class="button ghost" type="button" data-financial-clear-filters-button>
+                Limpar filtros
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Cadastro financeiro</span>
+                <h2 data-financial-form-title>Novo lancamento</h2>
+              </div>
+              <button class="button ghost" type="button" data-financial-new-button>
+                Novo lancamento
+              </button>
+            </div>
+
+            <form class="grid-form two-columns" data-financial-form>
+              <input type="hidden" name="id" />
+
+              <div class="field">
+                <label for="financialTipo">Tipo</label>
+                <select id="financialTipo" name="tipo" required>
+                  <option value="receita">Receita</option>
+                  <option value="despesa">Despesa</option>
+                  <option value="repasse">Repasse</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="financialStatus">Status</label>
+                <select id="financialStatus" name="status" required>
+                  <option value="pendente">Pendente</option>
+                  <option value="faturado">Faturado</option>
+                  <option value="pago">Pago</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+
+              <div class="field full">
+                <label for="financialDescricao">Descricao</label>
+                <input id="financialDescricao" name="descricao" maxlength="160" required />
+              </div>
+
+              <div class="field">
+                <label for="financialCliente">Cliente</label>
+                <select id="financialCliente" name="clienteId">
+                  <option value="">Sem cliente vinculado</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="financialEntrega">Entrega</label>
+                <select id="financialEntrega" name="entregaId">
+                  <option value="">Sem entrega vinculada</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="financialValor">Valor</label>
+                <input id="financialValor" name="valor" type="number" min="0" step="0.01" required />
+              </div>
+
+              <div class="field">
+                <label for="financialCompetencia">Data de competencia</label>
+                <input id="financialCompetencia" name="dataCompetencia" type="date" required />
+              </div>
+
+              <div class="field">
+                <label for="financialVencimento">Data de vencimento</label>
+                <input id="financialVencimento" name="dataVencimento" type="date" />
+              </div>
+
+              <div class="field">
+                <label for="financialPagamento">Data de pagamento</label>
+                <input id="financialPagamento" name="dataPagamento" type="date" />
+              </div>
+
+              <div class="field full">
+                <label for="financialObservacoes">Observacoes</label>
+                <textarea
+                  id="financialObservacoes"
+                  name="observacoes"
+                  rows="4"
+                  maxlength="2000"
+                ></textarea>
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-financial-submit-button>
+                  Salvar lancamento
+                </button>
+                <button class="button ghost" type="button" data-financial-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Detalhes</span>
+                <h2>Lancamento selecionado</h2>
+              </div>
+            </div>
+
+            <div class="delivery-details empty" data-financial-details>
+              Selecione um lancamento para visualizar os detalhes financeiros.
+            </div>
+
+            <form class="status-update-form" data-financial-status-form>
+              <div class="field">
+                <label for="financialQuickStatus">Atualizar status</label>
+                <select id="financialQuickStatus" name="status">
+                  <option value="pendente">Pendente</option>
+                  <option value="faturado">Faturado</option>
+                  <option value="pago">Pago</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="financialQuickPagamento">Data de pagamento</label>
+                <input id="financialQuickPagamento" name="dataPagamento" type="date" />
+              </div>
+
+              <button class="button ghost" type="submit">Atualizar status</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Movimentacoes</span>
+              <h2>Lancamentos financeiros</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Descricao</th>
+                  <th>Cliente</th>
+                  <th>Entrega</th>
+                  <th>Tipo</th>
+                  <th>Status</th>
+                  <th>Competencia</th>
+                  <th>Valor</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-financial-table-body>
+                <tr><td colspan="8">Carregando lancamentos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/financial.js"></script>
+  </body>
+</html>

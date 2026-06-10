@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Cadastro</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="auth-layout">
+        <aside class="hero-panel">
+          <div class="brand">
+            <div class="brand-badge">⌁</div>
+            <span>Cadastro inicial</span>
+          </div>
+          <h1>Prepare o acesso da equipe para uma operacao conectada.</h1>
+          <p>
+            Cadastre usuarios, defina perfis de acesso e inicie a base do portal
+            corporativo de uma empresa de entregas logisticas.
+          </p>
+
+          <div class="hero-metrics">
+            <div class="metric-card">
+              <strong>4 perfis</strong>
+              <span>Colaborador, motorista, operador e administrador</span>
+            </div>
+            <div class="metric-card">
+              <strong>Bcrypt</strong>
+              <span>Senha protegida por hash</span>
+            </div>
+            <div class="metric-card">
+              <strong>Portal</strong>
+              <span>Base pronta para evolucao</span>
+            </div>
+          </div>
+        </aside>
+
+        <section class="auth-card">
+          <h2>Criar acesso</h2>
+          <p>Preencha os dados iniciais do colaborador ou parceiro.</p>
+
+          <form class="grid-form two-columns" data-register-form>
+            <div class="field full">
+              <label for="nome">Nome completo</label>
+              <input id="nome" name="nome" type="text" placeholder="Nome completo" required autocomplete="name" />
+            </div>
+
+            <div class="field">
+              <label for="cpf">CPF</label>
+              <input id="cpf" name="cpf" type="text" placeholder="000.000.000-00" required inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="telefone">Telefone</label>
+              <input id="telefone" name="telefone" type="text" placeholder="(11) 99999-9999" required inputmode="tel" />
+            </div>
+
+            <div class="field full">
+              <label for="email">E-mail</label>
+              <input id="email" name="email" type="email" placeholder="nome@empresa.com" required autocomplete="email" />
+            </div>
+
+            <div class="field">
+              <label for="matricula">Matricula/codigo</label>
+              <input id="matricula" name="matricula" type="text" placeholder="COL1234" required autocomplete="username" />
+            </div>
+
+            <div class="field">
+              <label for="tipoUsuario">Tipo de usuario</label>
+              <select id="tipoUsuario" name="tipoUsuario" required>
+                <option value="colaborador">Colaborador</option>
+                <option value="motorista">Motorista</option>
+                <option value="operador">Operador</option>
+                <option value="administrador">Administrador</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="senha">Senha</label>
+              <input id="senha" name="senha" type="password" placeholder="Minimo de 6 caracteres" required autocomplete="new-password" />
+            </div>
+
+            <div class="field">
+              <label for="confirmacaoSenha">Confirmacao de senha</label>
+              <input
+                id="confirmacaoSenha"
+                name="confirmacaoSenha"
+                type="password"
+                placeholder="Repita a senha"
+                required
+                autocomplete="new-password"
+              />
+            </div>
+
+            <div class="field full actions">
+              <a href="/login">Ja tenho conta</a>
+              <button class="button primary" type="submit">Cadastrar e entrar</button>
+            </div>
+          </form>
+
+          <div class="helper-links">
+            <a href="/login">Voltar para o login</a>
+            <span style="color: #607086;">Recuperar senha em breve</span>
+          </div>
+
+          <div class="message" data-register-message></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+  </body>
+</html>

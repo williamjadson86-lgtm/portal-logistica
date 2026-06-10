@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Documentos</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell module-page" data-module-page data-api-endpoint="/api/documentos">
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Modulo ativo</span>
+            <h1 data-module-title>Documentos</h1>
+            <p data-module-description>Documentos obrigatorios e anexos.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+        <section class="module-summary-grid" data-module-summary></section>
+        <section class="module-panel">
+          <h2>Lista de documentos</h2>
+          <div class="module-list" data-module-items></div>
+        </section>
+      </section>
+    </main>
+    <script src="/public/js/main.js"></script>
+  </body>
+</html>

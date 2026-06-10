@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Entregas</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell deliveries-page" data-deliveries-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Operacao ativa</span>
+            <h1>Entregas operacionais</h1>
+            <p>Cadastre, acompanhe e atualize entregas em tempo real.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-delivery-message></div>
+
+        <section class="module-summary-grid" data-delivery-summary></section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Formulario operacional</span>
+                <h2 data-form-title>Nova entrega</h2>
+              </div>
+              <button class="button ghost" type="button" data-new-delivery-button>
+                Nova entrega
+              </button>
+            </div>
+
+            <form class="grid-form two-columns" data-delivery-form>
+              <input type="hidden" name="id" />
+
+              <div class="field">
+                <label for="codigo">Codigo da entrega</label>
+                <input id="codigo" name="codigo" maxlength="30" required />
+              </div>
+
+              <div class="field">
+                <label for="cliente">Cliente</label>
+                <input id="cliente" name="cliente" maxlength="160" required />
+              </div>
+
+              <div class="field full">
+                <label for="origem">Endereco de origem</label>
+                <input id="origem" name="origem" maxlength="255" required />
+              </div>
+
+              <div class="field full">
+                <label for="destino">Endereco de destino</label>
+                <input id="destino" name="destino" maxlength="255" required />
+              </div>
+
+              <div class="field">
+                <label for="cidade">Cidade</label>
+                <input id="cidade" name="cidade" maxlength="120" required />
+              </div>
+
+              <div class="field">
+                <label for="estado">Estado</label>
+                <input id="estado" name="estado" maxlength="2" required />
+              </div>
+
+              <div class="field">
+                <label for="status">Status</label>
+                <select id="status" name="status" required>
+                  <option value="pendente">Pendente</option>
+                  <option value="coletada">Coletada</option>
+                  <option value="em_transito">Em transito</option>
+                  <option value="em_rota">Em rota</option>
+                  <option value="entregue">Entregue</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="dataPrevista">Data prevista</label>
+                <input id="dataPrevista" name="dataPrevista" type="date" required />
+              </div>
+
+              <div class="field full">
+                <label for="observacoes">Observacoes</label>
+                <textarea
+                  id="observacoes"
+                  name="observacoes"
+                  rows="4"
+                  maxlength="2000"
+                ></textarea>
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-submit-button>
+                  Salvar entrega
+                </button>
+                <button class="button ghost" type="button" data-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Visualizacao</span>
+                <h2>Detalhes da entrega</h2>
+              </div>
+            </div>
+
+            <div class="delivery-details empty" data-delivery-details>
+              Selecione uma entrega para visualizar os detalhes operacionais.
+            </div>
+
+            <form class="status-update-form" data-status-form>
+              <div class="field">
+                <label for="statusRapido">Atualizar status</label>
+                <select id="statusRapido" name="status">
+                  <option value="pendente">Pendente</option>
+                  <option value="coletada">Coletada</option>
+                  <option value="em_transito">Em transito</option>
+                  <option value="em_rota">Em rota</option>
+                  <option value="entregue">Entregue</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+              <button class="button ghost" type="submit">Atualizar status</button>
+            </form>
+
+            <div class="timeline-section">
+              <div class="panel-heading compact">
+                <div>
+                  <span class="status-pill subtle">Timeline</span>
+                  <h2>Linha do tempo operacional</h2>
+                </div>
+              </div>
+
+              <div class="timeline-filters" data-delivery-event-filters></div>
+
+              <div class="timeline-list" data-delivery-events>
+                <article class="data-card empty">
+                  <strong>Nenhum evento carregado</strong>
+                  <p>Selecione uma entrega para visualizar o historico operacional completo.</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="proofs-section">
+              <div class="panel-heading compact">
+                <div>
+                  <span class="status-pill subtle">Comprovantes</span>
+                  <h2>Historico da entrega</h2>
+                </div>
+              </div>
+
+              <div class="message" data-delivery-proofs-message></div>
+
+              <div class="module-list" data-delivery-proofs-history>
+                <article class="data-card empty">
+                  <strong>Nenhum comprovante carregado</strong>
+                  <p>Selecione uma entrega para consultar o historico de comprovantes.</p>
+                </article>
+              </div>
+
+              <section class="proof-upload-shell" data-delivery-proof-form-shell>
+                <div class="panel-heading compact">
+                  <div>
+                    <span class="status-pill subtle">Upload rapido</span>
+                    <h2>Enviar comprovante</h2>
+                  </div>
+                </div>
+
+                <p class="helper-text" data-delivery-proof-hint>
+                  Selecione uma entrega para habilitar o envio de comprovantes.
+                </p>
+
+                <form class="grid-form" data-delivery-proof-form>
+                  <div class="field">
+                    <label for="proofTipoEntrega">Tipo</label>
+                    <select id="proofTipoEntrega" name="tipo">
+                      <option value="foto">Foto</option>
+                      <option value="pdf">PDF</option>
+                      <option value="assinatura">Assinatura</option>
+                      <option value="observacao">Observacao</option>
+                    </select>
+                  </div>
+
+                  <div class="field">
+                    <label for="proofArquivoEntrega">Arquivo</label>
+                    <input
+                      id="proofArquivoEntrega"
+                      name="arquivo"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.pdf"
+                    />
+                  </div>
+
+                  <div class="field">
+                    <label for="proofObservacaoEntrega">Observacao</label>
+                    <textarea
+                      id="proofObservacaoEntrega"
+                      name="observacao"
+                      rows="3"
+                      maxlength="2000"
+                    ></textarea>
+                  </div>
+
+                  <div class="actions">
+                    <button class="button primary" type="submit" data-proof-submit-button>
+                      Enviar comprovante
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Lista operacional</span>
+              <h2>Entregas cadastradas</h2>
+            </div>
+            <button class="button ghost" type="button" data-refresh-button>Atualizar lista</button>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Cliente</th>
+                  <th>Origem</th>
+                  <th>Destino</th>
+                  <th>Cidade/UF</th>
+                  <th>Status</th>
+                  <th>Data prevista</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-deliveries-table-body>
+                <tr>
+                  <td colspan="8">Carregando entregas...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/deliveries.js"></script>
+  </body>
+</html>

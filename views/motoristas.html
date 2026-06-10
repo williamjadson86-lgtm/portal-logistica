@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Motoristas</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell deliveries-page" data-drivers-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Operacao ativa</span>
+            <h1>Motoristas operacionais</h1>
+            <p>Cadastre, acompanhe e mantenha o quadro de condutores atualizado.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-driver-message></div>
+        <section class="module-summary-grid" data-driver-summary></section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Cadastro operacional</span>
+                <h2 data-form-title>Novo motorista</h2>
+              </div>
+              <button class="button ghost" type="button" data-new-driver-button>
+                Novo motorista
+              </button>
+            </div>
+
+            <form class="grid-form two-columns" data-driver-form>
+              <input type="hidden" name="id" />
+              <div class="field">
+                <label for="driverNome">Nome</label>
+                <input id="driverNome" name="nome" maxlength="150" required />
+              </div>
+              <div class="field">
+                <label for="driverCpf">CPF</label>
+                <input id="driverCpf" name="cpf" maxlength="14" required />
+              </div>
+              <div class="field">
+                <label for="driverCnh">CNH</label>
+                <input id="driverCnh" name="cnh" maxlength="30" required />
+              </div>
+              <div class="field">
+                <label for="driverCategoriaCnh">Categoria CNH</label>
+                <select id="driverCategoriaCnh" name="categoriaCnh" required>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="E">E</option>
+                  <option value="AB">AB</option>
+                  <option value="AC">AC</option>
+                  <option value="AD">AD</option>
+                  <option value="AE">AE</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="driverValidadeCnh">Validade CNH</label>
+                <input id="driverValidadeCnh" name="validadeCnh" type="date" required />
+              </div>
+              <div class="field">
+                <label for="driverTelefone">Telefone</label>
+                <input id="driverTelefone" name="telefone" maxlength="20" required />
+              </div>
+              <div class="field full">
+                <label for="driverStatus">Status</label>
+                <select id="driverStatus" name="status" required>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="afastado">Afastado</option>
+                </select>
+              </div>
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-submit-button>
+                  Salvar motorista
+                </button>
+                <button class="button ghost" type="button" data-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Visualizacao</span>
+                <h2>Detalhes do motorista</h2>
+              </div>
+            </div>
+
+            <div class="delivery-details empty" data-driver-details>
+              Selecione um motorista para visualizar os detalhes operacionais.
+            </div>
+
+            <form class="status-update-form" data-driver-status-form>
+              <div class="field">
+                <label for="driverStatusRapido">Atualizar status</label>
+                <select id="driverStatusRapido" name="status">
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="afastado">Afastado</option>
+                </select>
+              </div>
+              <button class="button ghost" type="submit">Atualizar status</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Equipe operacional</span>
+              <h2>Motoristas cadastrados</h2>
+            </div>
+            <button class="button ghost" type="button" data-refresh-button>Atualizar lista</button>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>CPF</th>
+                  <th>CNH</th>
+                  <th>Categoria</th>
+                  <th>Validade</th>
+                  <th>Telefone</th>
+                  <th>Status</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-drivers-table-body>
+                <tr><td colspan="8">Carregando motoristas...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/drivers.js"></script>
+  </body>
+</html>

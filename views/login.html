@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Login</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="auth-layout">
+        <aside class="hero-panel">
+          <div class="brand">
+            <div class="brand-badge">↗</div>
+            <span>Portal Logistica</span>
+          </div>
+          <h1>Conecte operacao, parceiros e entregas em um unico portal.</h1>
+          <p>
+            Uma base moderna para acesso de colaboradores, motoristas e operadores
+            com foco em produtividade, rastreabilidade e comunicacao clara.
+          </p>
+
+          <div class="hero-metrics">
+            <div class="metric-card">
+              <strong>24/7</strong>
+              <span>Disponibilidade para a operacao</span>
+            </div>
+            <div class="metric-card">
+              <strong>JWT</strong>
+              <span>Sessao protegida com autenticacao</span>
+            </div>
+            <div class="metric-card">
+              <strong>SQL</strong>
+              <span>Persistencia segura no PostgreSQL</span>
+            </div>
+          </div>
+        </aside>
+
+        <section class="auth-card">
+          <div class="brand">
+            <div class="brand-badge" style="background: rgba(25, 54, 184, 0.08); color: #1936b8;">⇄</div>
+            <span>Ambiente de colaboradores</span>
+          </div>
+
+          <h2>Entrar no portal</h2>
+          <p>Informe sua matricula e senha para acessar a area interna.</p>
+
+          <form class="grid-form" data-login-form>
+            <div class="field">
+              <label for="matricula">Matricula ou codigo</label>
+              <input id="matricula" name="matricula" type="text" placeholder="Ex.: COL1234" required autocomplete="username" />
+            </div>
+
+            <div class="field">
+              <label for="senha">Senha</label>
+              <input id="senha" name="senha" type="password" placeholder="Digite sua senha" required autocomplete="current-password" />
+            </div>
+
+            <button class="button primary" type="submit">Entrar</button>
+          </form>
+
+          <div class="helper-links">
+            <a href="/cadastro">Primeiro acesso / Cadastre-se</a>
+            <a href="/login">Recuperar senha</a>
+          </div>
+
+          <div class="message" data-login-message></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+  </body>
+</html>

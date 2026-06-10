@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Rotas</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell deliveries-page" data-routes-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Operacao ativa</span>
+            <h1>Rotas operacionais</h1>
+            <p>Planeje, acompanhe e conclua rotas com entregas, motorista e veiculo vinculados.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-route-message></div>
+        <section class="module-summary-grid" data-route-summary></section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Planejamento</span>
+                <h2 data-form-title>Nova rota</h2>
+              </div>
+              <button class="button ghost" type="button" data-new-route-button>Nova rota</button>
+            </div>
+
+            <form class="grid-form two-columns" data-route-form>
+              <input type="hidden" name="id" />
+
+              <div class="field">
+                <label for="routeCodigo">Codigo</label>
+                <input id="routeCodigo" name="codigo" maxlength="40" required />
+              </div>
+
+              <div class="field">
+                <label for="routeData">Data da rota</label>
+                <input id="routeData" name="dataRota" type="date" required />
+              </div>
+
+              <div class="field">
+                <label for="routeMotorista">Motorista</label>
+                <select id="routeMotorista" name="motoristaId" required></select>
+              </div>
+
+              <div class="field">
+                <label for="routeVeiculo">Veiculo</label>
+                <select id="routeVeiculo" name="veiculoId" required></select>
+              </div>
+
+              <div class="field full">
+                <label for="routeOrigem">Origem</label>
+                <input id="routeOrigem" name="origem" maxlength="150" required />
+              </div>
+
+              <div class="field full">
+                <label for="routeDestino">Destino</label>
+                <input id="routeDestino" name="destino" maxlength="150" required />
+              </div>
+
+              <div class="field full">
+                <label for="routeObservacoes">Observacoes</label>
+                <textarea id="routeObservacoes" name="observacoes" rows="4" maxlength="2000"></textarea>
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-submit-button>Salvar rota</button>
+                <button class="button ghost" type="button" data-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Execucao</span>
+                <h2>Detalhes da rota</h2>
+              </div>
+            </div>
+
+            <div class="delivery-details empty" data-route-details>
+              Selecione uma rota para visualizar os detalhes e executar as acoes operacionais.
+            </div>
+
+            <div class="detail-actions">
+              <button class="button ghost" type="button" data-route-action="start">Iniciar</button>
+              <button class="button ghost" type="button" data-route-action="complete">Concluir</button>
+              <button class="button ghost danger" type="button" data-route-action="cancel">Cancelar</button>
+            </div>
+          </article>
+        </section>
+
+        <section class="selection-grid">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Vinculos</span>
+                <h2>Entregas disponiveis</h2>
+              </div>
+            </div>
+
+            <form data-link-deliveries-form>
+              <div class="checkbox-list" data-available-deliveries></div>
+              <div class="actions selection-actions">
+                <button class="button primary" type="submit">Vincular entregas</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Historico</span>
+                <h2>Entregas da rota</h2>
+              </div>
+            </div>
+
+            <div class="module-list" data-linked-deliveries></div>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Monitoramento</span>
+              <h2>Rotas cadastradas</h2>
+            </div>
+            <button class="button ghost" type="button" data-refresh-button>Atualizar lista</button>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Motorista</th>
+                  <th>Veiculo</th>
+                  <th>Origem</th>
+                  <th>Destino</th>
+                  <th>Data</th>
+                  <th>Status</th>
+                  <th>Entregas</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-routes-table-body>
+                <tr><td colspan="9">Carregando rotas...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/routes.js"></script>
+  </body>
+</html>

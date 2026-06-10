@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Home</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell dashboard-home">
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Operacao ativa</span>
+            <h1>Ola, <span data-user-name>usuario</span></h1>
+            <p>
+              Perfil <strong data-user-role>colaborador</strong> | Matricula
+              <strong data-user-matricula>---</strong>
+            </p>
+          </div>
+
+          <button class="button ghost" type="button" data-logout-button>Sair</button>
+        </header>
+
+        <section class="portal-banner">
+          <article class="banner-panel">
+            <h2>Dashboard operacional executivo</h2>
+            <p>
+              Acompanhe entregas, rotas, equipe e frota com indicadores consolidados
+              para a operacao logistica.
+            </p>
+          </article>
+
+          <aside class="insight-card">
+            <h3>Filtro de periodo</h3>
+            <form class="grid-form" data-dashboard-filter-form>
+              <div class="field">
+                <label for="periodoDashboard">Periodo</label>
+                <select id="periodoDashboard" name="periodo" data-dashboard-period>
+                  <option value="hoje">Hoje</option>
+                  <option value="7d" selected>Ultimos 7 dias</option>
+                  <option value="30d">Ultimos 30 dias</option>
+                  <option value="custom">Periodo personalizado</option>
+                </select>
+              </div>
+
+              <div class="dashboard-custom-range" data-dashboard-custom-range hidden>
+                <div class="field">
+                  <label for="dataInicioDashboard">Data inicial</label>
+                  <input id="dataInicioDashboard" name="dataInicio" type="date" />
+                </div>
+                <div class="field">
+                  <label for="dataFimDashboard">Data final</label>
+                  <input id="dataFimDashboard" name="dataFim" type="date" />
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="button primary" type="submit">Aplicar filtro</button>
+              </div>
+            </form>
+          </aside>
+        </section>
+
+        <div class="message" data-dashboard-message></div>
+        <div class="dashboard-loading" data-dashboard-loading>Carregando indicadores...</div>
+
+        <section class="dashboard-section">
+          <div class="section-heading">
+            <div>
+              <span class="status-pill subtle">Indicadores</span>
+              <h2>Metricas principais</h2>
+            </div>
+            <p data-dashboard-period-label>Ultimos 7 dias</p>
+          </div>
+          <section class="dashboard-grid dashboard-grid-expanded" data-dashboard-grid></section>
+        </section>
+
+        <section class="dashboard-two-columns">
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Alertas</span>
+                <h2>Painel operacional</h2>
+              </div>
+            </div>
+            <div class="module-list" data-dashboard-alerts></div>
+          </article>
+
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Produtividade</span>
+                <h2>Resumo do periodo</h2>
+              </div>
+            </div>
+            <div class="module-list" data-dashboard-productivity></div>
+          </article>
+        </section>
+
+        <section class="dashboard-section">
+          <div class="section-heading">
+            <div>
+              <span class="status-pill subtle">Navegacao</span>
+              <h2>Modulos operacionais</h2>
+            </div>
+          </div>
+          <section class="cards-grid" data-cards-grid></section>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+  </body>
+</html>
