@@ -177,5 +177,5 @@ test("home autenticada carrega e api do portal retorna usuario autenticado", asy
   assert.equal(apiResponse.body.dashboard.totalEntregas, 3);
   assert.equal(apiResponse.body.dashboard.entregasEntregues, 1);
   assert.equal(apiResponse.body.rotas.rotasEmAndamento, 1);
-  assert.equal(apiResponse.body.cards.length, 12);
+  assert.equal(apiResponse.body.cards.length, 13);
 });

@@ -1,57 +1,30 @@
-const fs = require("fs");
+const { execFile } = require("child_process");
 const path = require("path");
-const { Client } = require("pg");
-const env = require("../src/config/env");
 
-function buildAdminConnectionString(connectionString) {
-  const url = new URL(connectionString);
-  url.pathname = "/postgres";
-  return url.toString();
-}
+function runScript(scriptName) {
+  return new Promise((resolve, reject) => {
+    execFile(process.execPath, [path.join(__dirname, scriptName)], (error, stdout, stderr) => {
+      if (stdout) {
+        process.stdout.write(stdout);
+      }
 
-function extractDatabaseName(connectionString) {
-  const url = new URL(connectionString);
-  return url.pathname.replace(/^\//, "");
-}
+      if (stderr) {
+        process.stderr.write(stderr);
+      }
 
-async function ensureDatabaseExists() {
-  const adminClient = new Client({
-    connectionString: buildAdminConnectionString(env.databaseUrl),
-    ssl: env.databaseSsl ? { rejectUnauthorized: false } : false,
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
   });
-  const databaseName = extractDatabaseName(env.databaseUrl);
-
-  await adminClient.connect();
-
-  const existsResult = await adminClient.query(
-    "SELECT 1 FROM pg_database WHERE datname = $1",
-    [databaseName],
-  );
-
-  if (existsResult.rowCount === 0) {
-    await adminClient.query(`CREATE DATABASE "${databaseName}"`);
-    console.log(`Banco de dados "${databaseName}" criado com sucesso.`);
-  }
-
-  await adminClient.end();
 }
 
 async function main() {
-  const sqlPath = path.join(__dirname, "..", "database", "init.sql");
-  const sql = fs.readFileSync(sqlPath, "utf8");
-
-  await ensureDatabaseExists();
-
-  const client = new Client({
-    connectionString: env.databaseUrl,
-    ssl: env.databaseSsl ? { rejectUnauthorized: false } : false,
-  });
-
-  await client.connect();
-  await client.query(sql);
-  await client.end();
-
-  console.log("database/init.sql executado com sucesso.");
+  await runScript("dbMigrate.js");
+  await runScript("dbSeed.js");
 }
 
 main().catch((error) => {

@@ -46,8 +46,16 @@
               </div>
 
               <div class="field">
+                <label for="clienteId">Cliente cadastrado</label>
+                <select id="clienteId" name="clienteId">
+                  <option value="">Informar manualmente</option>
+                </select>
+              </div>
+
+              <div class="field">
                 <label for="cliente">Cliente</label>
                 <input id="cliente" name="cliente" maxlength="160" required />
+                <small data-client-link-hint>Preencha manualmente ou selecione um cliente cadastrado.</small>
               </div>
 
               <div class="field full">

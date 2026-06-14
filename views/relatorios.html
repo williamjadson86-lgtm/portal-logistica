@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Relatorios</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell reports-page" data-reports-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Gestao por cliente</span>
+            <h1>Relatorios operacionais e financeiros</h1>
+            <p>Consolide entregas, comprovantes, rotas e receitas por cliente em uma unica visao.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-reports-message></div>
+        <div class="dashboard-loading" data-reports-loading hidden>Carregando relatorios...</div>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Filtros</span>
+                <h2>Consolidado por cliente</h2>
+              </div>
+              <div class="row-actions">
+                <button class="button ghost" type="button" data-reports-clear-filters-button>Limpar</button>
+                <button class="button ghost" type="button" data-reports-refresh-button>Atualizar</button>
+                <button class="button ghost" type="button" data-reports-export-button>Exportar CSV</button>
+                <button class="button ghost" type="button" data-reports-export-excel-button>Exportar Excel</button>
+              </div>
+            </div>
+
+            <form class="grid-form two-columns" data-reports-filter-form>
+              <div class="field full">
+                <label for="reportsCliente">Cliente</label>
+                <select id="reportsCliente" name="clienteId">
+                  <option value="">Todos os clientes</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="reportsDataInicio">Data inicial</label>
+                <input id="reportsDataInicio" name="dataInicio" type="date" />
+              </div>
+
+              <div class="field">
+                <label for="reportsDataFim">Data final</label>
+                <input id="reportsDataFim" name="dataFim" type="date" />
+              </div>
+
+              <div class="field">
+                <label for="reportsStatusEntrega">Status da entrega</label>
+                <select id="reportsStatusEntrega" name="statusEntrega">
+                  <option value="">Todos</option>
+                  <option value="pendente">Pendente</option>
+                  <option value="coletada">Coletada</option>
+                  <option value="em_transito">Em transito</option>
+                  <option value="em_rota">Em rota</option>
+                  <option value="entregue">Entregue</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="reportsStatusFinanceiro">Status financeiro</label>
+                <select id="reportsStatusFinanceiro" name="statusFinanceiro">
+                  <option value="">Todos</option>
+                  <option value="pendente">Pendente</option>
+                  <option value="faturado">Faturado</option>
+                  <option value="pago">Pago</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit">Aplicar filtros</button>
+              </div>
+            </form>
+
+            <section class="module-summary-grid" data-reports-summary></section>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Detalhe</span>
+                <h2>Cliente selecionado</h2>
+              </div>
+            </div>
+
+            <div class="delivery-details empty" data-reports-detail-summary>
+              Selecione um cliente no relatorio para visualizar o detalhe operacional e financeiro.
+            </div>
+
+            <div class="module-list" data-reports-detail-blocks>
+              <article class="data-card empty">
+                <strong>Nenhum cliente selecionado</strong>
+                <p>Use a tabela abaixo para abrir o detalhe completo de um cliente.</p>
+              </article>
+            </div>
+          </article>
+        </section>
+
+        <section class="dashboard-two-columns">
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Ranking</span>
+                <h2>Receita e volume</h2>
+              </div>
+            </div>
+            <div class="module-list" data-reports-ranking-main>
+              <article class="data-card empty">
+                <strong>Ranking indisponivel</strong>
+                <p>Carregue os relatorios para visualizar os destaques comerciais.</p>
+              </article>
+            </div>
+          </article>
+
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Pendencias</span>
+                <h2>Financeiro em atencao</h2>
+              </div>
+            </div>
+            <div class="module-list" data-reports-ranking-alerts>
+              <article class="data-card empty">
+                <strong>Nenhum alerta carregado</strong>
+                <p>Os clientes com maior pendencia e vencimento aparecerao aqui.</p>
+              </article>
+            </div>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Tabela gerencial</span>
+              <h2>Clientes consolidados</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Entregas</th>
+                  <th>Rotas</th>
+                  <th>Comprovantes</th>
+                  <th>Receita</th>
+                  <th>Pendente</th>
+                  <th>Pago</th>
+                  <th>Ticket medio</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-reports-table-body>
+                <tr>
+                  <td colspan="9">Carregando relatorios...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/reports.js"></script>
+  </body>
+  </html>

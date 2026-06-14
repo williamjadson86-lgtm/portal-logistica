@@ -1,4 +1,18 @@
 const database = require("../config/database");
+const HttpError = require("../errors/HttpError");
+
+function mapLinkedClient(row) {
+  if (!row?.clienteId) {
+    return null;
+  }
+
+  return {
+    id: row.clienteId,
+    nome: row.clienteNome || row.cliente,
+    documento: row.clienteDocumento || null,
+    status: row.clienteStatus || null,
+  };
+}
 
 function mapDelivery(row) {
   if (!row) {
@@ -8,7 +22,9 @@ function mapDelivery(row) {
   return {
     id: row.id,
     codigo: row.codigo,
+    clienteId: row.clienteId || null,
     cliente: row.cliente,
+    clienteCadastro: mapLinkedClient(row),
     origem: row.origem,
     destino: row.destino,
     cidade: row.cidade,
@@ -46,6 +62,73 @@ function mapDelivery(row) {
   };
 }
 
+async function findClientById(userId, clientId, client = database) {
+  const result = await client.query(
+    `SELECT id, nome, documento, status
+    FROM clientes
+    WHERE usuario_id = $1 AND id = $2`,
+    [userId, clientId],
+  );
+
+  return result.rows[0] || null;
+}
+
+async function resolveClientReference(userId, payload, options = {}) {
+  const { client = database, fallbackClientName = null } = options;
+
+  if (Object.hasOwn(payload, "clienteId")) {
+    if (payload.clienteId === null) {
+      return {
+        clienteId: null,
+        cliente: Object.hasOwn(payload, "cliente") ? payload.cliente : fallbackClientName,
+      };
+    }
+
+    const linkedClient = await findClientById(userId, payload.clienteId, client);
+    if (!linkedClient) {
+      throw new HttpError(404, "Cliente nao encontrado");
+    }
+
+    return {
+      clienteId: linkedClient.id,
+      cliente: linkedClient.nome,
+    };
+  }
+
+  if (Object.hasOwn(payload, "cliente")) {
+    return {
+      clienteId: undefined,
+      cliente: payload.cliente,
+    };
+  }
+
+  return {
+    clienteId: undefined,
+    cliente: undefined,
+  };
+}
+
+function buildDeliverySelect() {
+  return `SELECT
+      d.id,
+      d.codigo,
+      d.cliente_id AS "clienteId",
+      d.cliente,
+      c.nome AS "clienteNome",
+      c.documento AS "clienteDocumento",
+      c.status AS "clienteStatus",
+      d.origem,
+      d.destino,
+      d.cidade,
+      d.estado,
+      d.status,
+      TO_CHAR(d.previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
+      d.valor_frete AS "valorFrete",
+      COALESCE(d.observacoes, d.descricao, '') AS observacoes,
+      d.criado_em AS "criadoEm",
+      d.atualizado_em AS "atualizadoEm"`;
+}
+
 async function getDashboardSummary(userId) {
   const result = await database.query(
     `SELECT
@@ -63,23 +146,12 @@ async function getDashboardSummary(userId) {
 
 async function listByUserId(userId) {
   const result = await database.query(
-    `SELECT
-      id,
-      codigo,
-      cliente,
-      origem,
-      destino,
-      cidade,
-      estado,
-      status,
-      TO_CHAR(previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
-      valor_frete AS "valorFrete",
-      COALESCE(observacoes, descricao, '') AS observacoes,
-      criado_em AS "criadoEm",
-      atualizado_em AS "atualizadoEm"
-    FROM entregas
-    WHERE usuario_id = $1
-    ORDER BY previsao_entrega ASC NULLS LAST, criado_em DESC`,
+    `${buildDeliverySelect()}
+    FROM entregas d
+    LEFT JOIN clientes c
+      ON c.id = d.cliente_id
+    WHERE d.usuario_id = $1
+    ORDER BY d.previsao_entrega ASC NULLS LAST, d.criado_em DESC`,
     [userId],
   );
 
@@ -91,7 +163,11 @@ async function findById(userId, deliveryId) {
     `SELECT
       d.id,
       d.codigo,
+      d.cliente_id AS "clienteId",
       d.cliente,
+      c.nome AS "clienteNome",
+      c.documento AS "clienteDocumento",
+      c.status AS "clienteStatus",
       d.origem,
       d.destino,
       d.cidade,
@@ -112,6 +188,8 @@ async function findById(userId, deliveryId) {
       d.criado_em AS "criadoEm",
       d.atualizado_em AS "atualizadoEm"
     FROM entregas d
+    LEFT JOIN clientes c
+      ON c.id = d.cliente_id
     LEFT JOIN rota_entregas re
       ON re.entrega_id = d.id
       AND re.ativo = TRUE
@@ -130,10 +208,13 @@ async function findById(userId, deliveryId) {
 }
 
 async function create(userId, payload) {
+  const resolvedClient = await resolveClientReference(userId, payload);
+
   const result = await database.query(
     `INSERT INTO entregas (
       usuario_id,
       codigo,
+      cliente_id,
       cliente,
       descricao,
       origem,
@@ -145,25 +226,13 @@ async function create(userId, payload) {
       valor_frete,
       observacoes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    RETURNING
-      id,
-      codigo,
-      cliente,
-      origem,
-      destino,
-      cidade,
-      estado,
-      status,
-      TO_CHAR(previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
-      valor_frete AS "valorFrete",
-      COALESCE(observacoes, descricao, '') AS observacoes,
-      criado_em AS "criadoEm",
-      atualizado_em AS "atualizadoEm"`,
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    RETURNING id`,
     [
       userId,
       payload.codigo,
-      payload.cliente,
+      resolvedClient.clienteId || null,
+      resolvedClient.cliente,
       payload.observacoes,
       payload.origem,
       payload.destino,
@@ -176,15 +245,23 @@ async function create(userId, payload) {
     ],
   );
 
-  return mapDelivery(result.rows[0]);
+  return findById(userId, result.rows[0].id);
 }
 
 async function updateById(userId, deliveryId, payload) {
+  const current = await findById(userId, deliveryId);
+  if (!current) {
+    return null;
+  }
+
+  const resolvedClient = await resolveClientReference(userId, payload, {
+    fallbackClientName: current.cliente,
+  });
+
   const fields = [];
   const values = [userId, deliveryId];
   const mapping = {
     codigo: "codigo",
-    cliente: "cliente",
     origem: "origem",
     destino: "destino",
     cidade: "cidade",
@@ -209,6 +286,18 @@ async function updateById(userId, deliveryId, payload) {
     }
   }
 
+  if (Object.hasOwn(payload, "clienteId") || Object.hasOwn(payload, "cliente")) {
+    if (Object.hasOwn(resolvedClient, "clienteId")) {
+      values.push(resolvedClient.clienteId);
+      fields.push(`cliente_id = $${values.length}`);
+    }
+
+    if (typeof resolvedClient.cliente === "string" && resolvedClient.cliente) {
+      values.push(resolvedClient.cliente);
+      fields.push(`cliente = $${values.length}`);
+    }
+  }
+
   values.push(new Date().toISOString());
   fields.push(`atualizado_em = $${values.length}`);
 
@@ -216,24 +305,15 @@ async function updateById(userId, deliveryId, payload) {
     `UPDATE entregas
     SET ${fields.join(", ")}
     WHERE usuario_id = $1 AND id = $2
-    RETURNING
-      id,
-      codigo,
-      cliente,
-      origem,
-      destino,
-      cidade,
-      estado,
-      status,
-      TO_CHAR(previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
-      valor_frete AS "valorFrete",
-      COALESCE(observacoes, descricao, '') AS observacoes,
-      criado_em AS "criadoEm",
-      atualizado_em AS "atualizadoEm"`,
+    RETURNING id`,
     values,
   );
 
-  return mapDelivery(result.rows[0]);
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  return findById(userId, deliveryId);
 }
 
 async function updateStatusById(userId, deliveryId, status) {
@@ -241,24 +321,15 @@ async function updateStatusById(userId, deliveryId, status) {
     `UPDATE entregas
     SET status = $3, atualizado_em = NOW()
     WHERE usuario_id = $1 AND id = $2
-    RETURNING
-      id,
-      codigo,
-      cliente,
-      origem,
-      destino,
-      cidade,
-      estado,
-      status,
-      TO_CHAR(previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
-      valor_frete AS "valorFrete",
-      COALESCE(observacoes, descricao, '') AS observacoes,
-      criado_em AS "criadoEm",
-      atualizado_em AS "atualizadoEm"`,
+    RETURNING id`,
     [userId, deliveryId, status],
   );
 
-  return mapDelivery(result.rows[0]);
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  return findById(userId, deliveryId);
 }
 
 async function deleteById(userId, deliveryId) {

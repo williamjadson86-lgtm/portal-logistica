@@ -175,6 +175,40 @@ test("cria entrega com payload valido", async () => {
   assert.equal(capturedEvent.tipoEvento, "entrega_criada");
 });
 
+test("cria entrega vinculando cliente cadastrado via clienteId", async () => {
+  mockAuthenticatedUser();
+  deliveryRepository.create = async (_userId, payload) => ({
+    id: "cbf47b58-8d71-49b5-9d4c-66f4235073fd",
+    ...payload,
+    clienteId: "c47f787d-3b10-411b-b2f4-5e5d5cb5915c",
+    cliente: "Acme Logistica",
+    clienteCadastro: {
+      id: "c47f787d-3b10-411b-b2f4-5e5d5cb5915c",
+      nome: "Acme Logistica",
+      documento: "12.345.678/0001-90",
+      status: "ativo",
+    },
+  });
+
+  const response = await request(app)
+    .post("/api/entregas")
+    .set("Cookie", createCookie())
+    .send({
+      codigo: "ent-501",
+      clienteId: "c47f787d-3b10-411b-b2f4-5e5d5cb5915c",
+      origem: "Rua A, 10",
+      destino: "Rua B, 20",
+      cidade: "Sao Paulo",
+      estado: "sp",
+      status: "pendente",
+      dataPrevista: "2026-06-15",
+    });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.entrega.clienteId, "c47f787d-3b10-411b-b2f4-5e5d5cb5915c");
+  assert.equal(response.body.entrega.cliente, "Acme Logistica");
+});
+
 test("rejeita criacao com dados invalidos", async () => {
   mockAuthenticatedUser();
 

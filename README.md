@@ -1,6 +1,6 @@
 # Portal Logistica
 
-Portal web inicial para colaboradores e parceiros de uma empresa de entregas logisticas, com login, cadastro, home protegida e autenticacao por JWT em cookie `HttpOnly`.
+Portal web para colaboradores e parceiros de uma empresa de entregas logisticas, com login, cadastro, home protegida e autenticacao por JWT em cookie `HttpOnly`.
 
 ## Arquitetura
 
@@ -32,12 +32,16 @@ HTML/JS -> Rotas Express -> Controllers -> Validations -> Repositories -> Postgr
 
 ```text
 database/
-  init.sql
+  migrations/
+  seeds/
 public/
   css/
   img/
   js/
 scripts/
+  dbCommon.js
+  dbMigrate.js
+  dbSeed.js
   dbInit.js
 src/
   config/
@@ -118,43 +122,70 @@ JWT_EXPIRES_IN=8h
 COOKIE_NAME=portal_logistica_token
 ```
 
-## Criacao do banco local
+## Banco de dados
 
-### Opcao 1: via `psql`
+O projeto agora usa migrations versionadas com controle em `schema_migrations`. Isso evita drift entre ambientes e elimina o acoplamento com um unico `init.sql`.
 
-Crie o banco:
+### Fluxo recomendado
 
-```powershell
-psql -U postgres -h localhost -p 5432 -c "CREATE DATABASE portal_logistica;"
-```
-
-Depois execute o schema:
+1. Instale as dependencias:
 
 ```powershell
-psql -U postgres -h localhost -p 5432 -d portal_logistica -f database/init.sql
+npm install
 ```
 
-### Opcao 2: via pgAdmin
+2. Copie o arquivo de ambiente:
 
-1. Abra o pgAdmin.
-2. Crie um banco chamado `portal_logistica`.
-3. Abra o Query Tool desse banco.
-4. Cole o conteudo de `database/init.sql`.
-5. Execute o script.
+```powershell
+Copy-Item .env.example .env
+```
 
-### Opcao 3: via npm
+3. Ajuste o `.env` com a conexao do PostgreSQL:
 
-Se o banco `portal_logistica` ja existir e o `.env` estiver correto:
+```env
+PORT=3000
+DATABASE_URL=postgresql://postgres:SUA_SENHA@localhost:5432/portal_logistica
+DATABASE_SSL=false
+JWT_SECRET=troque-esta-chave-antes-de-publicar
+JWT_EXPIRES_IN=8h
+COOKIE_NAME=portal_logistica_token
+```
+
+4. Rode as migrations:
+
+```powershell
+npm run db:migrate
+```
+
+5. Rode o seed inicial:
+
+```powershell
+npm run db:seed
+```
+
+Isso cria ou atualiza o usuario administrador padrao:
+
+- email: `admin@portallogistica.com`
+- senha: `Admin@123`
+- tipo de usuario: `administrador`
+
+O seed usa `bcryptjs` para hashear a senha antes de persistir.
+
+### Script combinado
+
+Se preferir executar tudo em sequencia:
 
 ```powershell
 npm run db:init
 ```
 
-Esse comando executa o arquivo `database/init.sql` usando a conexao configurada em `DATABASE_URL`.
+Esse comando agora roda `db:migrate` e `db:seed`.
 
 ## Scripts npm
 
-- `npm run db:init`: executa o schema em `database/init.sql`
+- `npm run db:migrate`: aplica migrations pendentes em `database/migrations`
+- `npm run db:seed`: executa os seeds em `database/seeds`
+- `npm run db:init`: roda migrations e seed inicial em sequencia
 - `npm run dev`: inicia a aplicacao em modo watch
 - `npm start`: inicia a aplicacao normalmente
 - `npm test`: roda os testes automatizados
@@ -162,6 +193,8 @@ Esse comando executa o arquivo `database/init.sql` usando a conexao configurada 
 ## Como iniciar
 
 ```powershell
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
@@ -246,6 +279,8 @@ A suite cobre:
 
 - validacao de CPF e cadastro
 - validacao de login
+- descoberta e aplicacao das migrations pendentes
+- seed inicial com hash bcrypt do usuario administrador
 - cadastro com envio correto dos campos ao backend
 - emissao de cookie `HttpOnly`
 - geracao de JWT no login
@@ -256,3 +291,11 @@ A suite cobre:
 
 - Nao ha necessidade de CORS nesta primeira versao porque frontend e backend rodam na mesma origem.
 - Se o PostgreSQL estiver ativo e o `.env` correto, o fluxo completo funciona sem Docker.
+- O arquivo `.env` continua fora do versionamento e o `.gitignore` cobre variacoes locais comuns.
+- Em bancos antigos inicializados por `database/init.sql`, rode `npm run db:migrate` antes do deploy para registrar e complementar estruturas faltantes.
+
+## Observacoes de seguranca
+
+- Existe atualmente um finding moderado transitivo reportado pelo `npm audit` em `uuid@8.3.2`, trazido por `exceljs@4.4.0`.
+- Esse caso esta documentado em `docs/decisions/001-exceljs-audit.md` e permanece monitorado.
+- Nao use `npm audit fix --force` sem analise, porque a sugestao atual tenta fazer downgrade do `exceljs` e pode quebrar a exportacao `.xlsx`.

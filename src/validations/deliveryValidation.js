@@ -57,6 +57,8 @@ function validateCoreFields(input, options = {}) {
   const { partial = false } = options;
   const errors = [];
   const data = {};
+  let hasClienteValue = false;
+  let hasClienteIdValue = false;
 
   const fieldRules = [
     {
@@ -68,7 +70,7 @@ function validateCoreFields(input, options = {}) {
     },
     {
       key: "cliente",
-      required: true,
+      required: false,
       parse: parseText,
       validate: (value) => value.length >= 3 && value.length <= 160,
       message: "cliente deve ter entre 3 e 160 caracteres",
@@ -149,6 +151,26 @@ function validateCoreFields(input, options = {}) {
     }
 
     data[rule.key] = parsed;
+
+    if (rule.key === "cliente") {
+      hasClienteValue = true;
+    }
+  }
+
+  if (Object.hasOwn(input, "clienteId")) {
+    if (input.clienteId === null || input.clienteId === "") {
+      data.clienteId = null;
+      hasClienteIdValue = partial;
+    } else if (!isValidUuid(input.clienteId)) {
+      errors.push("clienteId invalido");
+    } else {
+      data.clienteId = String(input.clienteId);
+      hasClienteIdValue = true;
+    }
+  }
+
+  if (!partial && !hasClienteValue && !hasClienteIdValue) {
+    errors.push("cliente ou clienteId e obrigatorio");
   }
 
   if (partial && Object.keys(data).length === 0) {

@@ -99,6 +99,7 @@ function mockAuthenticatedUser() {
     entregas: [
       {
         id: "fedacdb3-bd12-4b9d-97ad-d94436fa17d9",
+        clienteId: "e66612f5-37f5-4f6a-b8fb-c6cbf8d2f74d",
         codigo: "ENT-001",
         cliente: "Acme Logistica",
         status: "entregue",
@@ -287,6 +288,7 @@ test("gera lancamento a partir de entrega concluida", async () => {
     createFinanceEntry({
       id: "9bb1bc7a-5d80-4308-b27a-0bb6a4a67645",
       entregaId: deliveryId,
+      clienteId: "e66612f5-37f5-4f6a-b8fb-c6cbf8d2f74d",
       descricao: payload.descricao,
       valor: payload.valor,
       dataCompetencia: payload.dataCompetencia,

@@ -363,6 +363,9 @@ function createDeliveryApp() {
   const message = document.querySelector("[data-delivery-message]");
   const summary = document.querySelector("[data-delivery-summary]");
   const form = document.querySelector("[data-delivery-form]");
+  const clientSelect = form.querySelector("[name='clienteId']");
+  const clientNameInput = form.querySelector("[name='cliente']");
+  const clientLinkHint = document.querySelector("[data-client-link-hint]");
   const formTitle = document.querySelector("[data-form-title]");
   const submitButton = document.querySelector("[data-submit-button]");
   const cancelEditButton = document.querySelector("[data-cancel-edit-button]");
@@ -385,6 +388,7 @@ function createDeliveryApp() {
   const newDeliveryButton = document.querySelector("[data-new-delivery-button]");
 
   let deliveries = [];
+  let availableClients = [];
   let selectedDeliveryId = null;
   let selectedDelivery = null;
   let selectedEvents = [];
@@ -411,9 +415,40 @@ function createDeliveryApp() {
     form.reset();
     form.elements.id.value = "";
     form.elements.status.value = "pendente";
+    form.elements.clienteId.value = "";
+    syncClientFields();
     formTitle.textContent = "Nova entrega";
     submitButton.textContent = "Salvar entrega";
     cancelEditButton.hidden = true;
+  }
+
+  function renderClientOptions(clients) {
+    availableClients = Array.isArray(clients) ? clients : [];
+    const options = availableClients
+      .map(
+        (client) =>
+          `<option value="${client.id}">${escapeHtml(client.nome)}${client.documento ? ` | ${escapeHtml(client.documento)}` : ""}</option>`,
+      )
+      .join("");
+
+    clientSelect.innerHTML = `<option value="">Informar manualmente</option>${options}`;
+  }
+
+  function syncClientFields() {
+    const selectedClientId = clientSelect.value;
+    const selectedClient = availableClients.find((client) => client.id === selectedClientId) || null;
+
+    if (selectedClient) {
+      clientNameInput.value = selectedClient.nome;
+      clientNameInput.readOnly = true;
+      clientNameInput.required = false;
+      clientLinkHint.textContent = "Cliente vinculado ao cadastro. O nome textual sera sincronizado automaticamente.";
+      return;
+    }
+
+    clientNameInput.readOnly = false;
+    clientNameInput.required = true;
+    clientLinkHint.textContent = "Preencha manualmente ou selecione um cliente cadastrado.";
   }
 
   function resetProofForm() {
@@ -425,7 +460,9 @@ function createDeliveryApp() {
   function fillForm(delivery) {
     form.elements.id.value = delivery.id;
     form.elements.codigo.value = delivery.codigo;
+    form.elements.clienteId.value = delivery.clienteId || "";
     form.elements.cliente.value = delivery.cliente;
+    syncClientFields();
     form.elements.origem.value = delivery.origem;
     form.elements.destino.value = delivery.destino;
     form.elements.cidade.value = delivery.cidade;
@@ -500,6 +537,10 @@ function createDeliveryApp() {
         <div>
           <span>Cliente</span>
           <strong>${delivery.cliente}</strong>
+        </div>
+        <div>
+          <span>Vinculo com cadastro</span>
+          <strong>${delivery.clienteCadastro ? delivery.clienteCadastro.nome : "Sem vinculo formal"}</strong>
         </div>
         <div>
           <span>Status</span>
@@ -642,12 +683,21 @@ function createDeliveryApp() {
     }
   }
 
+  async function loadClients() {
+    const response = await requestJson("/api/clientes");
+    renderClientOptions(response.clientes || []);
+    syncClientFields();
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     const payload = serializeForm(form);
     const deliveryId = payload.id;
 
     delete payload.id;
+    if (!payload.clienteId) {
+      delete payload.clienteId;
+    }
     payload.estado = payload.estado.toUpperCase();
 
     try {
@@ -832,6 +882,7 @@ function createDeliveryApp() {
   }
 
   form.addEventListener("submit", handleSubmit);
+  clientSelect.addEventListener("change", syncClientFields);
   proofForm.addEventListener("submit", handleProofSubmit);
   statusForm.addEventListener("submit", handleStatusSubmit);
   tableBody.addEventListener("click", handleRowAction);
@@ -854,7 +905,7 @@ function createDeliveryApp() {
   resetForm();
   resetProofForm();
   renderDeliveryDetails(null);
-  refreshList().catch((error) => {
+  Promise.all([loadClients(), refreshList()]).catch((error) => {
     handlePageError(error);
   });
 }

@@ -54,6 +54,12 @@ const cards = [
     href: "/financeiro",
   },
   {
+    titulo: "Relatorios",
+    icone: "RL",
+    descricao: "Acompanhe indicadores operacionais e financeiros por cliente.",
+    href: "/relatorios",
+  },
+  {
     titulo: "Documentos",
     icone: "DC",
     descricao: "Gerencie anexos e documentos obrigatorios.",

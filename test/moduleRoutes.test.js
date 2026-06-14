@@ -47,6 +47,7 @@ const modulePages = [
   "/veiculos",
   "/comprovantes",
   "/financeiro",
+  "/relatorios",
   "/documentos",
   "/suporte",
   "/avisos",
@@ -122,7 +123,7 @@ test("home api retorna dashboard de entregas autenticado", async () => {
   assert.equal(response.body.dashboard.totalEntregas, 7);
   assert.equal(response.body.dashboard.entregasEntregues, 4);
   assert.equal(response.body.rotas.rotasPlanejadas, 2);
-  assert.equal(response.body.cards.length, 12);
+  assert.equal(response.body.cards.length, 13);
 });
 
 test("modulos html exigem autenticacao", async () => {

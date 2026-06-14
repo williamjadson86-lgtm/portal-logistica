@@ -69,6 +69,7 @@ async function findDeliveryById(userId, deliveryId) {
   const result = await database.query(
     `SELECT
       id,
+      cliente_id AS "clienteId",
       codigo,
       cliente,
       status,
@@ -132,7 +133,9 @@ async function resolveLinkedEntities(userId, payload, options = {}) {
     );
 
     if (!client) {
-      client = await findClientByName(userId, delivery.cliente);
+      client = delivery.clienteId
+        ? await findClientById(userId, delivery.clienteId)
+        : await findClientByName(userId, delivery.cliente);
     }
   }
 
@@ -157,14 +160,15 @@ function buildSelectQuery() {
       c.documento AS "clienteDocumento",
       c.status AS "clienteStatus",
       e.codigo AS "entregaCodigo",
-      e.cliente AS "entregaCliente",
+      COALESCE(dc.nome, e.cliente) AS "entregaCliente",
       e.status AS "entregaStatus",
       e.valor_frete AS "entregaValorFrete",
       lf.criado_em AS "criadoEm",
       lf.atualizado_em AS "atualizadoEm"
     FROM lancamentos_financeiros lf
     LEFT JOIN clientes c ON c.id = lf.cliente_id
-    LEFT JOIN entregas e ON e.id = lf.entrega_id`;
+    LEFT JOIN entregas e ON e.id = lf.entrega_id
+    LEFT JOIN clientes dc ON dc.id = e.cliente_id`;
 }
 
 async function listByUserId(userId, filters = {}) {
@@ -384,7 +388,9 @@ async function createFromDelivery(userId, deliveryId, payload = {}) {
 
   const linkedClient = payload.clienteId
     ? await findClientById(userId, payload.clienteId)
-    : await findClientByName(userId, delivery.cliente);
+    : delivery.clienteId
+      ? await findClientById(userId, delivery.clienteId)
+      : await findClientByName(userId, delivery.cliente);
 
   if (payload.clienteId && !linkedClient) {
     throw new HttpError(404, "Cliente nao encontrado");
@@ -442,6 +448,7 @@ async function listSupportData(userId) {
     database.query(
       `SELECT
         e.id,
+        e.cliente_id AS "clienteId",
         e.codigo,
         e.cliente,
         e.status,
@@ -469,6 +476,7 @@ async function listSupportData(userId) {
     })),
     entregas: deliveriesResult.rows.map((row) => ({
       id: row.id,
+      clienteId: row.clienteId || null,
       codigo: row.codigo,
       cliente: row.cliente,
       status: row.status,

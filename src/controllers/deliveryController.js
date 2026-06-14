@@ -70,6 +70,7 @@ async function create(req, res) {
     descricao: `Entrega ${delivery.codigo} cadastrada para ${delivery.cliente}`,
     dados: {
       codigo: delivery.codigo,
+      clienteId: delivery.clienteId || null,
       cliente: delivery.cliente,
       status: delivery.status,
     },
