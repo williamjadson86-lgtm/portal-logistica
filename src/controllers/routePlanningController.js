@@ -69,7 +69,7 @@ async function create(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const result = await repository.create(req.user.id, data);
+  const result = await repository.create(req.user, data);
   res.status(201).json({ mensagem: "Rota cadastrada com sucesso", ...result });
 }
 
@@ -80,13 +80,13 @@ async function update(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const result = await repository.updateById(req.user.id, req.params.id, data);
+  const result = await repository.updateById(req.user, req.params.id, data);
   res.json({ mensagem: "Rota atualizada com sucesso", ...result });
 }
 
 async function remove(req, res) {
   ensureValidUuid(req.params.id, "rota");
-  const deleted = await repository.deleteById(req.user.id, req.params.id);
+  const deleted = await repository.deleteById(req.user, req.params.id);
 
   if (!deleted) {
     throw new HttpError(404, "Rota nao encontrada");
@@ -102,7 +102,7 @@ async function addDeliveries(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const result = await repository.addDeliveries(req.user.id, req.params.id, data.entregaIds);
+  const result = await repository.addDeliveries(req.user, req.params.id, data.entregaIds);
   await registerDeliveryEvents(
     req.user?.id,
     result.rota.entregas
@@ -125,7 +125,7 @@ async function removeDelivery(req, res) {
   ensureValidUuid(req.params.id, "rota");
   ensureValidUuid(req.params.entregaId, "entrega");
   const result = await repository.removeDelivery(
-    req.user.id,
+    req.user,
     req.params.id,
     req.params.entregaId,
   );
@@ -147,7 +147,7 @@ async function removeDelivery(req, res) {
 
 async function start(req, res) {
   ensureValidUuid(req.params.id, "rota");
-  const result = await repository.startRoute(req.user.id, req.params.id);
+  const result = await repository.startRoute(req.user, req.params.id);
   await registerDeliveryEvents(
     req.user?.id,
     result.rota.entregas.map((entrega) => ({
@@ -166,7 +166,7 @@ async function start(req, res) {
 
 async function complete(req, res) {
   ensureValidUuid(req.params.id, "rota");
-  const result = await repository.completeRoute(req.user.id, req.params.id);
+  const result = await repository.completeRoute(req.user, req.params.id);
   await registerDeliveryEvents(
     req.user?.id,
     result.rota.entregas.map((entrega) => ({
@@ -185,7 +185,7 @@ async function complete(req, res) {
 
 async function cancel(req, res) {
   ensureValidUuid(req.params.id, "rota");
-  const result = await repository.cancelRoute(req.user.id, req.params.id);
+  const result = await repository.cancelRoute(req.user, req.params.id);
   await registerDeliveryEvents(
     req.user?.id,
     result.rota.entregas.map((entrega) => ({

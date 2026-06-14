@@ -11,9 +11,11 @@ const {
 function buildTokenPayload(user) {
   return {
     sub: user.id,
+    userId: user.id,
     nome: user.nome,
     matricula: user.matricula,
     tipoUsuario: user.tipoUsuario,
+    empresaId: user.empresaId || null,
   };
 }
 
@@ -93,6 +95,7 @@ async function login(req, res) {
     mensagem: "Login realizado com sucesso",
     usuario: {
       id: user.id,
+      empresaId: user.empresaId || null,
       nome: user.nome,
       matricula: user.matricula,
       tipoUsuario: user.tipoUsuario,

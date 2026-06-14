@@ -1,21 +1,28 @@
 const database = require("../config/database");
 const { onlyDigits } = require("../utils/cpf");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
-async function findLinkedDriverId(user) {
-  const cpf = onlyDigits(user?.cpf);
+async function findLinkedDriverId(actor) {
+  const context = normalizeActor(actor);
+  const cpf = onlyDigits(context.cpf);
 
-  if (!user?.id || !cpf) {
+  if (!context.userId || !cpf) {
     return null;
   }
 
+  const tenant = buildTenantCondition({
+    actor: context,
+    tableAlias: "m",
+  });
+  const cpfIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT id
-    FROM motoristas
-    WHERE usuario_id = $1
-      AND regexp_replace(cpf, '\D', '', 'g') = $2
+    FROM motoristas m
+    WHERE ${tenant.condition}
+      AND regexp_replace(cpf, '\D', '', 'g') = $${cpfIndex}
     ORDER BY criado_em ASC
     LIMIT 1`,
-    [user.id, cpf],
+    [...tenant.params, cpf],
   );
 
   return result.rows[0]?.id || null;

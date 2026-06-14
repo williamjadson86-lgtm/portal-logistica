@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { createDefaultCompany } = require("../../src/repositories/companyRepository");
 
 const DEFAULT_ADMIN_USER = {
   nome: "Administrador Portal Logistica",
@@ -25,9 +26,11 @@ function buildAdminSeed(env = process.env) {
 async function seedAdminUser(client, env = process.env) {
   const admin = buildAdminSeed(env);
   const senhaHash = await bcrypt.hash(admin.senha, 10);
+  const empresa = await createDefaultCompany(admin, client);
 
   const result = await client.query(
     `INSERT INTO usuarios (
+      empresa_id,
       nome,
       cpf,
       email,
@@ -37,9 +40,10 @@ async function seedAdminUser(client, env = process.env) {
       tipo_usuario,
       ativo
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
     ON CONFLICT (email)
     DO UPDATE SET
+      empresa_id = COALESCE(usuarios.empresa_id, EXCLUDED.empresa_id),
       nome = EXCLUDED.nome,
       cpf = EXCLUDED.cpf,
       telefone = EXCLUDED.telefone,
@@ -48,8 +52,9 @@ async function seedAdminUser(client, env = process.env) {
       tipo_usuario = EXCLUDED.tipo_usuario,
       ativo = TRUE,
       atualizado_em = NOW()
-    RETURNING id, email, matricula, tipo_usuario AS "tipoUsuario"`,
+    RETURNING id, empresa_id AS "empresaId", email, matricula, tipo_usuario AS "tipoUsuario"`,
     [
+      empresa.id,
       admin.nome,
       admin.cpf,
       admin.email,

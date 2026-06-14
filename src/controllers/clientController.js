@@ -34,13 +34,13 @@ function ensureFound(client) {
 }
 
 async function list(req, res) {
-  const clientes = await repository.listByUserId(req.user.id);
+  const clientes = await repository.listByUserId(req.user);
   res.json({ resumo: buildSummary(clientes), clientes });
 }
 
 async function show(req, res) {
   ensureValidUuid(req.params.id);
-  const cliente = await repository.findById(req.user.id, req.params.id);
+  const cliente = await repository.findById(req.user, req.params.id);
   ensureFound(cliente);
   res.json({ cliente });
 }
@@ -51,7 +51,7 @@ async function create(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const cliente = await repository.create(req.user.id, data);
+  const cliente = await repository.create(req.user, data);
   res.status(201).json({ mensagem: "Cliente cadastrado com sucesso", cliente });
 }
 
@@ -62,7 +62,7 @@ async function update(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const cliente = await repository.updateById(req.user.id, req.params.id, data);
+  const cliente = await repository.updateById(req.user, req.params.id, data);
   ensureFound(cliente);
   res.json({ mensagem: "Cliente atualizado com sucesso", cliente });
 }
@@ -74,14 +74,14 @@ async function updateStatus(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const cliente = await repository.updateStatusById(req.user.id, req.params.id, data.status);
+  const cliente = await repository.updateStatusById(req.user, req.params.id, data.status);
   ensureFound(cliente);
   res.json({ mensagem: "Status do cliente atualizado com sucesso", cliente });
 }
 
 async function remove(req, res) {
   ensureValidUuid(req.params.id);
-  const cliente = await repository.deleteById(req.user.id, req.params.id);
+  const cliente = await repository.deleteById(req.user, req.params.id);
   ensureFound(cliente);
   res.json({ mensagem: "Cliente excluido com sucesso" });
 }

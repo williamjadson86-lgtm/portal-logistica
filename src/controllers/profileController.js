@@ -6,7 +6,7 @@ function page(_req, res) {
 }
 
 async function data(req, res) {
-  const result = await repository.findByUserId(req.user.id);
+  const result = await repository.findByUserId(req.user);
   const profile = result.profile;
 
   res.json({

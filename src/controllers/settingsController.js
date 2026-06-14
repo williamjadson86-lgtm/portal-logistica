@@ -6,7 +6,7 @@ function page(_req, res) {
 }
 
 async function data(req, res) {
-  const settings = await repository.findByUserId(req.user.id);
+  const settings = await repository.findByUserId(req.user);
 
   res.json({
     usuario: req.user,

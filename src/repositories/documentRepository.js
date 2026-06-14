@@ -1,6 +1,8 @@
 const database = require("../config/database");
+const { buildTenantCondition } = require("./tenantContext");
 
-async function listByUserId(userId) {
+async function listByUserId(actor) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "d" });
   const result = await database.query(
     `SELECT
       nome,
@@ -8,10 +10,10 @@ async function listByUserId(userId) {
       status,
       TO_CHAR(validade_em, 'YYYY-MM-DD') AS "validadeEm",
       criado_em AS "criadoEm"
-    FROM documentos
-    WHERE usuario_id = $1
+    FROM documentos d
+    WHERE ${tenant.condition}
     ORDER BY criado_em DESC`,
-    [userId],
+    tenant.params,
   );
 
   return result.rows;

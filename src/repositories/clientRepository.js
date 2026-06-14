@@ -1,4 +1,5 @@
 const database = require("../config/database");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function formatDocument(value) {
   const digits = String(value || "").replace(/\D/g, "");
@@ -39,7 +40,8 @@ function mapClient(row) {
   };
 }
 
-async function listByUserId(userId) {
+async function listByUserId(actor) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "c" });
   const result = await database.query(
     `SELECT
       id,
@@ -55,16 +57,18 @@ async function listByUserId(userId) {
       observacoes,
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"
-    FROM clientes
-    WHERE usuario_id = $1
+    FROM clientes c
+    WHERE ${tenant.condition}
     ORDER BY nome ASC`,
-    [userId],
+    tenant.params,
   );
 
   return result.rows.map(mapClient);
 }
 
-async function findById(userId, clientId) {
+async function findById(actor, clientId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "c" });
+  const clientIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       id,
@@ -80,18 +84,20 @@ async function findById(userId, clientId) {
       observacoes,
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"
-    FROM clientes
-    WHERE usuario_id = $1 AND id = $2`,
-    [userId, clientId],
+    FROM clientes c
+    WHERE ${tenant.condition} AND id = $${clientIdIndex}`,
+    [...tenant.params, clientId],
   );
 
   return mapClient(result.rows[0]);
 }
 
-async function create(userId, payload) {
+async function create(actor, payload) {
+  const context = normalizeActor(actor);
   const result = await database.query(
     `INSERT INTO clientes (
       usuario_id,
+      empresa_id,
       nome,
       documento,
       email,
@@ -103,7 +109,7 @@ async function create(userId, payload) {
       status,
       observacoes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING
       id,
       nome,
@@ -119,7 +125,8 @@ async function create(userId, payload) {
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"`,
     [
-      userId,
+      context.userId,
+      context.empresaId,
       payload.nome,
       payload.documento,
       payload.email,
@@ -136,9 +143,10 @@ async function create(userId, payload) {
   return mapClient(result.rows[0]);
 }
 
-async function updateById(userId, clientId, payload) {
+async function updateById(actor, clientId, payload) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "clientes", startIndex: 2 });
   const fields = [];
-  const values = [userId, clientId];
+  const values = [clientId, ...tenant.params];
   const mapping = {
     nome: "nome",
     documento: "documento",
@@ -166,7 +174,7 @@ async function updateById(userId, clientId, payload) {
   const result = await database.query(
     `UPDATE clientes
     SET ${fields.join(", ")}
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING
       id,
       nome,
@@ -187,11 +195,12 @@ async function updateById(userId, clientId, payload) {
   return mapClient(result.rows[0]);
 }
 
-async function updateStatusById(userId, clientId, status) {
+async function updateStatusById(actor, clientId, status) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "clientes", startIndex: 3 });
   const result = await database.query(
     `UPDATE clientes
-    SET status = $3, atualizado_em = NOW()
-    WHERE usuario_id = $1 AND id = $2
+    SET status = $2, atualizado_em = NOW()
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING
       id,
       nome,
@@ -206,18 +215,19 @@ async function updateStatusById(userId, clientId, status) {
       observacoes,
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"`,
-    [userId, clientId, status],
+    [clientId, status, ...tenant.params],
   );
 
   return mapClient(result.rows[0]);
 }
 
-async function deleteById(userId, clientId) {
+async function deleteById(actor, clientId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "clientes", startIndex: 2 });
   const result = await database.query(
     `DELETE FROM clientes
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING id`,
-    [userId, clientId],
+    [clientId, ...tenant.params],
   );
 
   return result.rows[0] || null;

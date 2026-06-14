@@ -17,7 +17,7 @@ async function list(req, res) {
     throw new HttpError(404, "Entrega nao encontrada");
   }
 
-  const eventos = await eventRepository.listByDeliveryId(req.user.id, req.params.id);
+  const eventos = await eventRepository.listByDeliveryId(req.user, req.params.id);
   res.json({ eventos });
 }
 

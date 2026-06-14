@@ -63,8 +63,8 @@ async function list(req, res) {
   }
 
   const [entries, supportData] = await Promise.all([
-    repository.listByUserId(req.user.id, data),
-    repository.listSupportData(req.user.id),
+    repository.listByUserId(req.user, data),
+    repository.listSupportData(req.user),
   ]);
 
   res.json({
@@ -77,7 +77,7 @@ async function list(req, res) {
 
 async function show(req, res) {
   ensureValidUuid(req.params.id);
-  const entry = await repository.findById(req.user.id, req.params.id);
+  const entry = await repository.findById(req.user, req.params.id);
   ensureFound(entry);
   res.json({ lancamento: entry });
 }
@@ -88,7 +88,7 @@ async function create(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const entry = await repository.create(req.user.id, data);
+  const entry = await repository.create(req.user, data);
   res.status(201).json({
     mensagem: "Lancamento financeiro criado com sucesso",
     lancamento: entry,
@@ -102,7 +102,7 @@ async function update(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const entry = await repository.updateById(req.user.id, req.params.id, data);
+  const entry = await repository.updateById(req.user, req.params.id, data);
   ensureFound(entry);
   res.json({
     mensagem: "Lancamento financeiro atualizado com sucesso",
@@ -118,7 +118,7 @@ async function updateStatus(req, res) {
   }
 
   const entry = await repository.updateStatusById(
-    req.user.id,
+    req.user,
     req.params.id,
     data.status,
     data.dataPagamento,
@@ -132,7 +132,7 @@ async function updateStatus(req, res) {
 
 async function remove(req, res) {
   ensureValidUuid(req.params.id);
-  const entry = await repository.cancelById(req.user.id, req.params.id);
+  const entry = await repository.cancelById(req.user, req.params.id);
   ensureFound(entry);
   res.json({
     mensagem: "Lancamento financeiro cancelado com sucesso",

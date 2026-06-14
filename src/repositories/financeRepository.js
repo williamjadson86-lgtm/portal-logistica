@@ -1,5 +1,6 @@
 const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapFinancialEntry(row) {
   if (!row) {
@@ -41,31 +42,37 @@ function mapFinancialEntry(row) {
   };
 }
 
-async function findClientById(userId, clientId) {
+async function findClientById(actor, clientId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "c" });
+  const clientIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT id, nome, documento, status
-    FROM clientes
-    WHERE usuario_id = $1 AND id = $2`,
-    [userId, clientId],
+    FROM clientes c
+    WHERE ${tenant.condition} AND id = $${clientIdIndex}`,
+    [...tenant.params, clientId],
   );
 
   return result.rows[0] || null;
 }
 
-async function findClientByName(userId, clientName) {
+async function findClientByName(actor, clientName) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "c" });
+  const clientNameIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT id, nome, documento, status
-    FROM clientes
-    WHERE usuario_id = $1 AND LOWER(nome) = LOWER($2)
+    FROM clientes c
+    WHERE ${tenant.condition} AND LOWER(nome) = LOWER($${clientNameIndex})
     ORDER BY criado_em ASC
     LIMIT 1`,
-    [userId, clientName],
+    [...tenant.params, clientName],
   );
 
   return result.rows[0] || null;
 }
 
-async function findDeliveryById(userId, deliveryId) {
+async function findDeliveryById(actor, deliveryId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "entregas" });
+  const deliveryIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       id,
@@ -76,28 +83,29 @@ async function findDeliveryById(userId, deliveryId) {
       TO_CHAR(previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
       valor_frete AS "valorFrete"
     FROM entregas
-    WHERE usuario_id = $1 AND id = $2`,
-    [userId, deliveryId],
+    WHERE ${tenant.condition} AND id = $${deliveryIdIndex}`,
+    [...tenant.params, deliveryId],
   );
 
   return result.rows[0] || null;
 }
 
-async function ensureActiveDeliveryFinancialUniqueness(userId, entregaId, excludedId = null) {
+async function ensureActiveDeliveryFinancialUniqueness(actor, entregaId, excludedId = null) {
   if (!entregaId) {
     return;
   }
 
-  const values = [userId, entregaId];
+  const tenant = buildTenantCondition({ actor, tableAlias: "lancamentos_financeiros" });
+  const values = [...tenant.params, entregaId];
   let query = `SELECT id
     FROM lancamentos_financeiros
-    WHERE usuario_id = $1
-      AND entrega_id = $2
+    WHERE ${tenant.condition}
+      AND entrega_id = $${tenant.nextIndex}
       AND status <> 'cancelado'`;
 
   if (excludedId) {
     values.push(excludedId);
-    query += ` AND id <> $3`;
+    query += ` AND id <> $${tenant.nextIndex + 1}`;
   }
 
   query += " LIMIT 1";
@@ -108,34 +116,34 @@ async function ensureActiveDeliveryFinancialUniqueness(userId, entregaId, exclud
   }
 }
 
-async function resolveLinkedEntities(userId, payload, options = {}) {
+async function resolveLinkedEntities(actor, payload, options = {}) {
   const { excludedFinancialId = null } = options;
   let client = null;
   let delivery = null;
 
   if (payload.clienteId) {
-    client = await findClientById(userId, payload.clienteId);
+    client = await findClientById(actor, payload.clienteId);
     if (!client) {
       throw new HttpError(404, "Cliente nao encontrado");
     }
   }
 
   if (payload.entregaId) {
-    delivery = await findDeliveryById(userId, payload.entregaId);
+    delivery = await findDeliveryById(actor, payload.entregaId);
     if (!delivery) {
       throw new HttpError(404, "Entrega nao encontrada");
     }
 
     await ensureActiveDeliveryFinancialUniqueness(
-      userId,
+      actor,
       payload.entregaId,
       excludedFinancialId,
     );
 
     if (!client) {
       client = delivery.clienteId
-        ? await findClientById(userId, delivery.clienteId)
-        : await findClientByName(userId, delivery.cliente);
+        ? await findClientById(actor, delivery.clienteId)
+        : await findClientByName(actor, delivery.cliente);
     }
   }
 
@@ -171,9 +179,10 @@ function buildSelectQuery() {
     LEFT JOIN clientes dc ON dc.id = e.cliente_id`;
 }
 
-async function listByUserId(userId, filters = {}) {
-  const conditions = ["lf.usuario_id = $1"];
-  const values = [userId];
+async function listByUserId(actor, filters = {}) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "lf" });
+  const conditions = [tenant.condition];
+  const values = [...tenant.params];
 
   if (filters.status) {
     values.push(filters.status);
@@ -210,18 +219,21 @@ async function listByUserId(userId, filters = {}) {
   return result.rows.map(mapFinancialEntry);
 }
 
-async function findById(userId, financialId) {
+async function findById(actor, financialId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "lf" });
+  const financialIdIndex = tenant.nextIndex;
   const result = await database.query(
     `${buildSelectQuery()}
-    WHERE lf.usuario_id = $1 AND lf.id = $2`,
-    [userId, financialId],
+    WHERE ${tenant.condition} AND lf.id = $${financialIdIndex}`,
+    [...tenant.params, financialId],
   );
 
   return mapFinancialEntry(result.rows[0]);
 }
 
-async function create(userId, payload) {
-  const { client, delivery } = await resolveLinkedEntities(userId, payload);
+async function create(actor, payload) {
+  const context = normalizeActor(actor);
+  const { client, delivery } = await resolveLinkedEntities(actor, payload);
   const status = payload.status || "pendente";
   const dataPagamento =
     status === "pago"
@@ -231,6 +243,7 @@ async function create(userId, payload) {
   const result = await database.query(
     `INSERT INTO lancamentos_financeiros (
       usuario_id,
+      empresa_id,
       cliente_id,
       entrega_id,
       tipo,
@@ -242,10 +255,11 @@ async function create(userId, payload) {
       data_pagamento,
       observacoes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING id`,
     [
-      userId,
+      context.userId,
+      context.empresaId,
       client?.id || null,
       payload.entregaId || null,
       payload.tipo || "receita",
@@ -259,11 +273,12 @@ async function create(userId, payload) {
     ],
   );
 
-  return findById(userId, result.rows[0].id);
+  return findById(actor, result.rows[0].id);
 }
 
-async function updateById(userId, financialId, payload) {
-  const current = await findById(userId, financialId);
+async function updateById(actor, financialId, payload) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "lancamentos_financeiros", startIndex: 2 });
+  const current = await findById(actor, financialId);
   if (!current) {
     return null;
   }
@@ -272,12 +287,12 @@ async function updateById(userId, financialId, payload) {
     clienteId: Object.hasOwn(payload, "clienteId") ? payload.clienteId : current.clienteId,
     entregaId: Object.hasOwn(payload, "entregaId") ? payload.entregaId : current.entregaId,
   };
-  const { client } = await resolveLinkedEntities(userId, mergedPayload, {
+  const { client } = await resolveLinkedEntities(actor, mergedPayload, {
     excludedFinancialId: financialId,
   });
 
   const fields = [];
-  const values = [userId, financialId];
+  const values = [financialId, ...tenant.params];
   const mapping = {
     clienteId: "cliente_id",
     entregaId: "entrega_id",
@@ -321,28 +336,32 @@ async function updateById(userId, financialId, payload) {
   await database.query(
     `UPDATE lancamentos_financeiros
     SET ${fields.join(", ")}
-    WHERE usuario_id = $1 AND id = $2`,
+    WHERE id = $1 AND ${tenant.condition}`,
     values,
   );
 
-  return findById(userId, financialId);
+  return findById(actor, financialId);
 }
 
-async function updateStatusById(userId, financialId, status, dataPagamento = null) {
-  const values = [userId, financialId, status];
+async function updateStatusById(actor, financialId, status, dataPagamento = null) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "lancamentos_financeiros", startIndex: 3 });
+  const values = [financialId, status, ...tenant.params];
   const fields = ["status = $3", "atualizado_em = NOW()"];
 
   if (status === "pago") {
+    values[1] = status;
+    fields[0] = "status = $2";
     values.push(dataPagamento || new Date().toISOString().slice(0, 10));
     fields.push(`data_pagamento = $${values.length}`);
   } else {
+    fields[0] = "status = $2";
     fields.push("data_pagamento = NULL");
   }
 
   const result = await database.query(
     `UPDATE lancamentos_financeiros
     SET ${fields.join(", ")}
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING id`,
     values,
   );
@@ -351,31 +370,32 @@ async function updateStatusById(userId, financialId, status, dataPagamento = nul
     return null;
   }
 
-  return findById(userId, financialId);
+  return findById(actor, financialId);
 }
 
-async function cancelById(userId, financialId) {
-  return updateStatusById(userId, financialId, "cancelado");
+async function cancelById(actor, financialId) {
+  return updateStatusById(actor, financialId, "cancelado");
 }
 
-async function cancelPendingByDeliveryId(userId, deliveryId) {
+async function cancelPendingByDeliveryId(actor, deliveryId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "lancamentos_financeiros", startIndex: 2 });
   const result = await database.query(
     `UPDATE lancamentos_financeiros
     SET status = 'cancelado',
         data_pagamento = NULL,
         atualizado_em = NOW()
-    WHERE usuario_id = $1
-      AND entrega_id = $2
+    WHERE entrega_id = $1
+      AND ${tenant.condition}
       AND status = 'pendente'
     RETURNING id`,
-    [userId, deliveryId],
+    [deliveryId, ...tenant.params],
   );
 
   return result.rows;
 }
 
-async function createFromDelivery(userId, deliveryId, payload = {}) {
-  const delivery = await findDeliveryById(userId, deliveryId);
+async function createFromDelivery(actor, deliveryId, payload = {}) {
+  const delivery = await findDeliveryById(actor, deliveryId);
   if (!delivery) {
     throw new HttpError(404, "Entrega nao encontrada");
   }
@@ -384,13 +404,13 @@ async function createFromDelivery(userId, deliveryId, payload = {}) {
     throw new HttpError(409, "A entrega precisa estar concluida para gerar lancamento");
   }
 
-  await ensureActiveDeliveryFinancialUniqueness(userId, deliveryId);
+  await ensureActiveDeliveryFinancialUniqueness(actor, deliveryId);
 
   const linkedClient = payload.clienteId
-    ? await findClientById(userId, payload.clienteId)
+    ? await findClientById(actor, payload.clienteId)
     : delivery.clienteId
-      ? await findClientById(userId, delivery.clienteId)
-      : await findClientByName(userId, delivery.cliente);
+      ? await findClientById(actor, delivery.clienteId)
+      : await findClientByName(actor, delivery.cliente);
 
   if (payload.clienteId && !linkedClient) {
     throw new HttpError(404, "Cliente nao encontrado");
@@ -404,9 +424,11 @@ async function createFromDelivery(userId, deliveryId, payload = {}) {
     );
   }
 
+  const context = normalizeActor(actor);
   const result = await database.query(
     `INSERT INTO lancamentos_financeiros (
       usuario_id,
+      empresa_id,
       cliente_id,
       entrega_id,
       tipo,
@@ -418,10 +440,11 @@ async function createFromDelivery(userId, deliveryId, payload = {}) {
       data_pagamento,
       observacoes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, 'pendente', $7, $8, NULL, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendente', $8, $9, NULL, $10)
     RETURNING id`,
     [
-      userId,
+      context.userId,
+      context.empresaId,
       linkedClient?.id || null,
       deliveryId,
       payload.tipo || "receita",
@@ -433,17 +456,19 @@ async function createFromDelivery(userId, deliveryId, payload = {}) {
     ],
   );
 
-  return findById(userId, result.rows[0].id);
+  return findById(actor, result.rows[0].id);
 }
 
-async function listSupportData(userId) {
+async function listSupportData(actor) {
+  const clientTenant = buildTenantCondition({ actor, tableAlias: "clientes" });
+  const deliveryTenant = buildTenantCondition({ actor, tableAlias: "e" });
   const [clientsResult, deliveriesResult] = await Promise.all([
     database.query(
       `SELECT id, nome, documento, status
       FROM clientes
-      WHERE usuario_id = $1
+      WHERE ${clientTenant.condition}
       ORDER BY nome ASC`,
-      [userId],
+      clientTenant.params,
     ),
     database.query(
       `SELECT
@@ -461,9 +486,9 @@ async function listSupportData(userId) {
             AND lf.status <> 'cancelado'
         ) AS "temLancamentoAtivo"
       FROM entregas e
-      WHERE e.usuario_id = $1
+      WHERE ${deliveryTenant.condition}
       ORDER BY e.previsao_entrega DESC NULLS LAST, e.codigo ASC`,
-      [userId],
+      deliveryTenant.params,
     ),
   ]);
 

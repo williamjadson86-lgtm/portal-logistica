@@ -62,7 +62,7 @@ async function create(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const delivery = await repository.create(req.user.id, data);
+  const delivery = await repository.create(req.user, data);
   await eventRepository.appendEvent({
     entregaId: delivery.id,
     usuarioId: req.user?.id || null,
@@ -90,11 +90,11 @@ async function update(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const delivery = await repository.updateById(req.user.id, req.params.id, data);
+  const delivery = await repository.updateById(req.user, req.params.id, data);
   ensureFound(delivery);
 
   if (delivery.status === "cancelada") {
-    await financeRepository.cancelPendingByDeliveryId(req.user.id, delivery.id);
+    await financeRepository.cancelPendingByDeliveryId(req.user, delivery.id);
   }
 
   await eventRepository.appendEvent({
@@ -122,11 +122,11 @@ async function updateStatus(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const delivery = await repository.updateStatusById(req.user.id, req.params.id, data.status);
+  const delivery = await repository.updateStatusById(req.user, req.params.id, data.status);
   ensureFound(delivery);
 
   if (delivery.status === "cancelada") {
-    await financeRepository.cancelPendingByDeliveryId(req.user.id, delivery.id);
+    await financeRepository.cancelPendingByDeliveryId(req.user, delivery.id);
   }
 
   await eventRepository.appendEvent({
@@ -148,7 +148,7 @@ async function updateStatus(req, res) {
 
 async function remove(req, res) {
   ensureValidUuid(req.params.id);
-  const delivery = await repository.deleteById(req.user.id, req.params.id);
+  const delivery = await repository.deleteById(req.user, req.params.id);
   ensureFound(delivery);
 
   res.json({
@@ -167,7 +167,7 @@ async function createFinancialEntry(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const entry = await financeRepository.createFromDelivery(req.user.id, req.params.id, data);
+  const entry = await financeRepository.createFromDelivery(req.user, req.params.id, data);
 
   res.status(201).json({
     mensagem: "Lancamento financeiro gerado com sucesso",

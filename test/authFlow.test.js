@@ -42,6 +42,7 @@ test("cadastro envia os campos esperados e retorna cookie HttpOnly", async () =>
     receivedPayload = payload;
     return {
       id: "8e1f7c7c-8a1d-43a9-b7c4-52f6b5a96ff1",
+      empresaId: "empresa-001",
       nome: payload.nome,
       cpf: payload.cpf,
       email: payload.email,
@@ -89,6 +90,7 @@ test("login gera JWT valido e envia cookie HttpOnly", async () => {
 
   repository.findByMatricula = async () => ({
     id: "97c9345d-e2db-4f8d-8610-a189f8f8d738",
+    empresaId: "empresa-002",
     nome: "Carlos Souza",
     matricula: "COL4321",
     tipoUsuario: "operador",
@@ -111,8 +113,10 @@ test("login gera JWT valido e envia cookie HttpOnly", async () => {
   const payload = jwt.verify(cookieValue, env.jwtSecret);
 
   assert.equal(payload.sub, "97c9345d-e2db-4f8d-8610-a189f8f8d738");
+  assert.equal(payload.userId, "97c9345d-e2db-4f8d-8610-a189f8f8d738");
   assert.equal(payload.matricula, "COL4321");
   assert.equal(payload.tipoUsuario, "operador");
+  assert.equal(payload.empresaId, "empresa-002");
 });
 
 test("home redireciona para login sem autenticacao", async () => {
@@ -133,6 +137,7 @@ test("home autenticada carrega e api do portal retorna usuario autenticado", asy
   const token = jwt.sign(
     {
       sub: "bbf6e8c9-f903-4f9a-a15d-5fbb63f5a6d0",
+      empresaId: "empresa-003",
       nome: "Ana Lima",
       matricula: "ADM1000",
       tipoUsuario: "administrador",
@@ -143,6 +148,7 @@ test("home autenticada carrega e api do portal retorna usuario autenticado", asy
 
   repository.findById = async () => ({
     id: "bbf6e8c9-f903-4f9a-a15d-5fbb63f5a6d0",
+    empresaId: "empresa-003",
     nome: "Ana Lima",
     cpf: "529.982.247-25",
     email: "ana@empresa.com",
@@ -175,6 +181,7 @@ test("home autenticada carrega e api do portal retorna usuario autenticado", asy
   assert.match(homeResponse.text, /Portal Logistica \| Home/);
   assert.equal(apiResponse.status, 200);
   assert.equal(apiResponse.body.usuario.nome, "Ana Lima");
+  assert.equal(apiResponse.body.usuario.empresaId, "empresa-003");
   assert.equal(apiResponse.body.dashboard.totalEntregas, 3);
   assert.equal(apiResponse.body.dashboard.entregasEntregues, 1);
   assert.equal(apiResponse.body.rotas.rotasEmAndamento, 1);

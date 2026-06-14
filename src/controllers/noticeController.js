@@ -6,7 +6,7 @@ function page(_req, res) {
 }
 
 async function data(req, res) {
-  const notices = await repository.listActive();
+  const notices = await repository.listActive(req.user);
 
   res.json({
     usuario: req.user,

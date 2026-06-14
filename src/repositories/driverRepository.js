@@ -1,4 +1,5 @@
 const database = require("../config/database");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapDriver(row) {
   if (!row) {
@@ -19,7 +20,8 @@ function mapDriver(row) {
   };
 }
 
-async function listByUserId(userId) {
+async function listByUserId(actor) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "m" });
   const result = await database.query(
     `SELECT
       id,
@@ -32,16 +34,18 @@ async function listByUserId(userId) {
       status,
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"
-    FROM motoristas
-    WHERE usuario_id = $1
+    FROM motoristas m
+    WHERE ${tenant.condition}
     ORDER BY nome ASC`,
-    [userId],
+    tenant.params,
   );
 
   return result.rows.map(mapDriver);
 }
 
-async function findById(userId, driverId) {
+async function findById(actor, driverId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "m" });
+  const driverIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       id,
@@ -54,18 +58,20 @@ async function findById(userId, driverId) {
       status,
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"
-    FROM motoristas
-    WHERE usuario_id = $1 AND id = $2`,
-    [userId, driverId],
+    FROM motoristas m
+    WHERE ${tenant.condition} AND id = $${driverIdIndex}`,
+    [...tenant.params, driverId],
   );
 
   return mapDriver(result.rows[0]);
 }
 
-async function create(userId, payload) {
+async function create(actor, payload) {
+  const context = normalizeActor(actor);
   const result = await database.query(
     `INSERT INTO motoristas (
       usuario_id,
+      empresa_id,
       nome,
       cpf,
       cnh,
@@ -74,7 +80,7 @@ async function create(userId, payload) {
       telefone,
       status
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING
       id,
       nome,
@@ -87,7 +93,8 @@ async function create(userId, payload) {
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"`,
     [
-      userId,
+      context.userId,
+      context.empresaId,
       payload.nome,
       payload.cpf,
       payload.cnh,
@@ -101,9 +108,10 @@ async function create(userId, payload) {
   return mapDriver(result.rows[0]);
 }
 
-async function updateById(userId, driverId, payload) {
+async function updateById(actor, driverId, payload) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "motoristas", startIndex: 2 });
   const fields = [];
-  const values = [userId, driverId];
+  const values = [driverId, ...tenant.params];
   const mapping = {
     nome: "nome",
     cpf: "cpf",
@@ -128,7 +136,7 @@ async function updateById(userId, driverId, payload) {
   const result = await database.query(
     `UPDATE motoristas
     SET ${fields.join(", ")}
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING
       id,
       nome,
@@ -146,11 +154,12 @@ async function updateById(userId, driverId, payload) {
   return mapDriver(result.rows[0]);
 }
 
-async function updateStatusById(userId, driverId, status) {
+async function updateStatusById(actor, driverId, status) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "motoristas", startIndex: 3 });
   const result = await database.query(
     `UPDATE motoristas
-    SET status = $3, atualizado_em = NOW()
-    WHERE usuario_id = $1 AND id = $2
+    SET status = $2, atualizado_em = NOW()
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING
       id,
       nome,
@@ -162,18 +171,19 @@ async function updateStatusById(userId, driverId, status) {
       status,
       criado_em AS "criadoEm",
       atualizado_em AS "atualizadoEm"`,
-    [userId, driverId, status],
+    [driverId, status, ...tenant.params],
   );
 
   return mapDriver(result.rows[0]);
 }
 
-async function deleteById(userId, driverId) {
+async function deleteById(actor, driverId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "motoristas", startIndex: 2 });
   const result = await database.query(
     `DELETE FROM motoristas
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING id`,
-    [userId, driverId],
+    [driverId, ...tenant.params],
   );
 
   return result.rows[0] || null;

@@ -114,7 +114,7 @@ async function update(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const comprovante = await repository.updateById(req.user.id, req.params.id, data);
+  const comprovante = await repository.updateById(req.user, req.params.id, data);
 
   if (!comprovante) {
     throw new HttpError(404, "Comprovante nao encontrado");
@@ -133,7 +133,7 @@ async function remove(req, res) {
     throw new HttpError(404, "Comprovante nao encontrado");
   }
 
-  const comprovante = await repository.deactivateById(req.user.id, req.params.id);
+  const comprovante = await repository.deactivateById(req.user, req.params.id);
 
   if (!comprovante) {
     throw new HttpError(404, "Comprovante nao encontrado");

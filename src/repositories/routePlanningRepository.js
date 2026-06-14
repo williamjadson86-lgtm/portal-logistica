@@ -2,6 +2,7 @@ const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
 const { USER_ROLES } = require("../config/permissions");
 const { findLinkedDriverId } = require("./driverAccessRepository");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 const ELIGIBLE_DELIVERY_STATUSES = ["pendente", "coletada", "em_transito"];
 
@@ -48,21 +49,24 @@ function mapLinkedDelivery(row) {
   };
 }
 
-async function getSupportData(userId, client = database) {
+async function getSupportData(actor, client = database) {
+  const routeTenant = buildTenantCondition({ actor, tableAlias: "d" });
+  const driverTenant = buildTenantCondition({ actor, tableAlias: "motoristas" });
+  const vehicleTenant = buildTenantCondition({ actor, tableAlias: "veiculos" });
   const [driversResult, vehiclesResult, deliveriesResult] = await Promise.all([
     client.query(
       `SELECT id, nome
       FROM motoristas
-      WHERE usuario_id = $1 AND status = 'ativo'
+      WHERE ${driverTenant.condition} AND status = 'ativo'
       ORDER BY nome ASC`,
-      [userId],
+      driverTenant.params,
     ),
     client.query(
       `SELECT id, placa, modelo
       FROM veiculos
-      WHERE usuario_id = $1 AND status = 'disponivel'
+      WHERE ${vehicleTenant.condition} AND status = 'disponivel'
       ORDER BY placa ASC`,
-      [userId],
+      vehicleTenant.params,
     ),
     client.query(
       `SELECT
@@ -72,7 +76,7 @@ async function getSupportData(userId, client = database) {
         d.status,
         TO_CHAR(d.previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista"
       FROM entregas d
-      WHERE d.usuario_id = $1
+      WHERE ${routeTenant.condition}
         AND d.status = ANY($2::text[])
         AND NOT EXISTS (
           SELECT 1
@@ -81,7 +85,7 @@ async function getSupportData(userId, client = database) {
             AND re.ativo = TRUE
         )
       ORDER BY d.previsao_entrega ASC NULLS LAST, d.codigo ASC`,
-      [userId, ELIGIBLE_DELIVERY_STATUSES],
+      [...routeTenant.params, ELIGIBLE_DELIVERY_STATUSES],
     ),
   ]);
 
@@ -96,7 +100,8 @@ async function getSupportData(userId, client = database) {
   };
 }
 
-async function getDashboardSummary(userId) {
+async function getDashboardSummary(actor) {
+  const tenant = buildTenantCondition({ actor });
   const result = await database.query(
     `SELECT
       COUNT(*)::int AS total,
@@ -104,8 +109,8 @@ async function getDashboardSummary(userId) {
       COUNT(*) FILTER (WHERE status = 'em_andamento')::int AS "emAndamento",
       COUNT(*) FILTER (WHERE status = 'concluida')::int AS concluidas
     FROM rotas_operacionais
-    WHERE usuario_id = $1`,
-    [userId],
+    WHERE ${tenant.condition}`,
+    tenant.params,
   );
 
   return result.rows[0];
@@ -113,7 +118,7 @@ async function getDashboardSummary(userId) {
 
 async function getDashboardSummaryForUser(user) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return getDashboardSummary(user.id);
+    return getDashboardSummary(user);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -126,6 +131,8 @@ async function getDashboardSummaryForUser(user) {
     };
   }
 
+  const tenant = buildTenantCondition({ actor: user });
+  const driverIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       COUNT(*)::int AS total,
@@ -133,15 +140,16 @@ async function getDashboardSummaryForUser(user) {
       COUNT(*) FILTER (WHERE status = 'em_andamento')::int AS "emAndamento",
       COUNT(*) FILTER (WHERE status = 'concluida')::int AS concluidas
     FROM rotas_operacionais
-    WHERE usuario_id = $1
-      AND motorista_id = $2`,
-    [user.id, driverId],
+    WHERE ${tenant.condition}
+      AND motorista_id = $${driverIdIndex}`,
+    [...tenant.params, driverId],
   );
 
   return result.rows[0];
 }
 
-async function listByUserId(userId) {
+async function listByUserId(actor) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "r" });
   const result = await database.query(
     `SELECT
       r.id,
@@ -163,10 +171,10 @@ async function listByUserId(userId) {
     LEFT JOIN motoristas m ON m.id = r.motorista_id
     LEFT JOIN veiculos v ON v.id = r.veiculo_id
     LEFT JOIN rota_entregas re ON re.rota_id = r.id
-    WHERE r.usuario_id = $1
+    WHERE ${tenant.condition}
     GROUP BY r.id, m.nome, v.placa
     ORDER BY r.data_rota DESC, r.criado_em DESC`,
-    [userId],
+    tenant.params,
   );
 
   return result.rows.map(mapRoute);
@@ -174,7 +182,7 @@ async function listByUserId(userId) {
 
 async function listForUser(user) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return listByUserId(user.id);
+    return listByUserId(user);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -182,6 +190,8 @@ async function listForUser(user) {
     return [];
   }
 
+  const tenant = buildTenantCondition({ actor: user, tableAlias: "r" });
+  const driverIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       r.id,
@@ -203,17 +213,19 @@ async function listForUser(user) {
     LEFT JOIN motoristas m ON m.id = r.motorista_id
     LEFT JOIN veiculos v ON v.id = r.veiculo_id
     LEFT JOIN rota_entregas re ON re.rota_id = r.id
-    WHERE r.usuario_id = $1
-      AND r.motorista_id = $2
+    WHERE ${tenant.condition}
+      AND r.motorista_id = $${driverIdIndex}
     GROUP BY r.id, m.nome, v.placa
     ORDER BY r.data_rota DESC, r.criado_em DESC`,
-    [user.id, driverId],
+    [...tenant.params, driverId],
   );
 
   return result.rows.map(mapRoute);
 }
 
-async function findById(userId, routeId, client = database) {
+async function findById(actor, routeId, client = database) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "r" });
+  const routeIdIndex = tenant.nextIndex;
   const routeResult = await client.query(
     `SELECT
       r.id,
@@ -235,9 +247,9 @@ async function findById(userId, routeId, client = database) {
     LEFT JOIN motoristas m ON m.id = r.motorista_id
     LEFT JOIN veiculos v ON v.id = r.veiculo_id
     LEFT JOIN rota_entregas re ON re.rota_id = r.id
-    WHERE r.usuario_id = $1 AND r.id = $2
+    WHERE ${tenant.condition} AND r.id = $${routeIdIndex}
     GROUP BY r.id, m.nome, v.placa`,
-    [userId, routeId],
+    [...tenant.params, routeId],
   );
 
   const route = mapRoute(routeResult.rows[0]);
@@ -245,6 +257,8 @@ async function findById(userId, routeId, client = database) {
     return null;
   }
 
+  const relationTenant = buildTenantCondition({ actor, tableAlias: "re" });
+  const relationRouteIdIndex = relationTenant.nextIndex;
   const deliveriesResult = await client.query(
     `SELECT
       re.id AS "relacaoId",
@@ -263,9 +277,9 @@ async function findById(userId, routeId, client = database) {
       COALESCE(d.observacoes, d.descricao, '') AS observacoes
     FROM rota_entregas re
     INNER JOIN entregas d ON d.id = re.entrega_id
-    WHERE re.usuario_id = $1 AND re.rota_id = $2
+    WHERE ${relationTenant.condition} AND re.rota_id = $${relationRouteIdIndex}
     ORDER BY re.ativo DESC, re.vinculado_em DESC`,
-    [userId, routeId],
+    [...relationTenant.params, routeId],
   );
 
   return {
@@ -276,7 +290,7 @@ async function findById(userId, routeId, client = database) {
 
 async function findByIdForUser(user, routeId, client = database) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return findById(user.id, routeId, client);
+    return findById(user, routeId, client);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -284,6 +298,9 @@ async function findByIdForUser(user, routeId, client = database) {
     return null;
   }
 
+  const tenant = buildTenantCondition({ actor: user, tableAlias: "r" });
+  const routeIdIndex = tenant.nextIndex;
+  const driverIdIndex = tenant.nextIndex + 1;
   const routeResult = await client.query(
     `SELECT
       r.id,
@@ -305,11 +322,11 @@ async function findByIdForUser(user, routeId, client = database) {
     LEFT JOIN motoristas m ON m.id = r.motorista_id
     LEFT JOIN veiculos v ON v.id = r.veiculo_id
     LEFT JOIN rota_entregas re ON re.rota_id = r.id
-    WHERE r.usuario_id = $1
-      AND r.id = $2
-      AND r.motorista_id = $3
+    WHERE ${tenant.condition}
+      AND r.id = $${routeIdIndex}
+      AND r.motorista_id = $${driverIdIndex}
     GROUP BY r.id, m.nome, v.placa`,
-    [user.id, routeId, driverId],
+    [...tenant.params, routeId, driverId],
   );
 
   const route = mapRoute(routeResult.rows[0]);
@@ -317,6 +334,8 @@ async function findByIdForUser(user, routeId, client = database) {
     return null;
   }
 
+  const relationTenant = buildTenantCondition({ actor: user, tableAlias: "re" });
+  const relationRouteIdIndex = relationTenant.nextIndex;
   const deliveriesResult = await client.query(
     `SELECT
       re.id AS "relacaoId",
@@ -335,10 +354,10 @@ async function findByIdForUser(user, routeId, client = database) {
       COALESCE(d.observacoes, d.descricao, '') AS observacoes
     FROM rota_entregas re
     INNER JOIN entregas d ON d.id = re.entrega_id
-    WHERE re.usuario_id = $1
-      AND re.rota_id = $2
+    WHERE ${relationTenant.condition}
+      AND re.rota_id = $${relationRouteIdIndex}
     ORDER BY re.ativo DESC, re.vinculado_em DESC`,
-    [user.id, routeId],
+    [...relationTenant.params, routeId],
   );
 
   return {
@@ -349,7 +368,7 @@ async function findByIdForUser(user, routeId, client = database) {
 
 async function getSupportDataForUser(user, client = database) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return getSupportData(user.id, client);
+    return getSupportData(user, client);
   }
 
   return {
@@ -359,12 +378,14 @@ async function getSupportDataForUser(user, client = database) {
   };
 }
 
-async function ensureDriverActive(client, userId, motoristaId) {
+async function ensureDriverActive(client, actor, motoristaId) {
+  const tenant = buildTenantCondition({ actor, startIndex: 1 });
+  const motoristaIdIndex = tenant.nextIndex;
   const result = await client.query(
     `SELECT id
     FROM motoristas
-    WHERE usuario_id = $1 AND id = $2 AND status = 'ativo'`,
-    [userId, motoristaId],
+    WHERE ${tenant.condition} AND id = $${motoristaIdIndex} AND status = 'ativo'`,
+    [...tenant.params, motoristaId],
   );
 
   if (result.rowCount === 0) {
@@ -372,12 +393,14 @@ async function ensureDriverActive(client, userId, motoristaId) {
   }
 }
 
-async function ensureVehicleAvailable(client, userId, veiculoId) {
+async function ensureVehicleAvailable(client, actor, veiculoId) {
+  const tenant = buildTenantCondition({ actor, startIndex: 1 });
+  const vehicleIdIndex = tenant.nextIndex;
   const result = await client.query(
     `SELECT id
     FROM veiculos
-    WHERE usuario_id = $1 AND id = $2 AND status = 'disponivel'`,
-    [userId, veiculoId],
+    WHERE ${tenant.condition} AND id = $${vehicleIdIndex} AND status = 'disponivel'`,
+    [...tenant.params, veiculoId],
   );
 
   if (result.rowCount === 0) {
@@ -385,13 +408,15 @@ async function ensureVehicleAvailable(client, userId, veiculoId) {
   }
 }
 
-async function ensureRouteExistsForUpdate(client, userId, routeId) {
+async function ensureRouteExistsForUpdate(client, actor, routeId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "rotas_operacionais", startIndex: 1 });
+  const routeIdIndex = tenant.nextIndex;
   const result = await client.query(
     `SELECT id, status, veiculo_id AS "veiculoId", motorista_id AS "motoristaId"
     FROM rotas_operacionais
-    WHERE usuario_id = $1 AND id = $2
+    WHERE ${tenant.condition} AND id = $${routeIdIndex}
     FOR UPDATE`,
-    [userId, routeId],
+    [...tenant.params, routeId],
   );
 
   const route = result.rows[0];
@@ -402,17 +427,19 @@ async function ensureRouteExistsForUpdate(client, userId, routeId) {
   return route;
 }
 
-async function create(userId, payload) {
+async function create(actor, payload) {
+  const context = normalizeActor(actor);
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    await ensureDriverActive(client, userId, payload.motoristaId);
-    await ensureVehicleAvailable(client, userId, payload.veiculoId);
+    await ensureDriverActive(client, actor, payload.motoristaId);
+    await ensureVehicleAvailable(client, actor, payload.veiculoId);
 
     const result = await client.query(
       `INSERT INTO rotas_operacionais (
         usuario_id,
+        empresa_id,
         codigo,
         motorista_id,
         veiculo_id,
@@ -424,10 +451,11 @@ async function create(userId, payload) {
         nome,
         distancia_km
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'planejada', $8, $2, 0)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'planejada', $9, $3, 0)
       RETURNING id`,
       [
-        userId,
+        context.userId,
+        context.empresaId,
         payload.codigo,
         payload.motoristaId,
         payload.veiculoId,
@@ -438,8 +466,8 @@ async function create(userId, payload) {
       ],
     );
 
-    const route = await findById(userId, result.rows[0].id, client);
-    const apoio = await getSupportData(userId, client);
+    const route = await findById(actor, result.rows[0].id, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: route, apoio };
   } catch (error) {
@@ -450,27 +478,28 @@ async function create(userId, payload) {
   }
 }
 
-async function updateById(userId, routeId, payload) {
+async function updateById(actor, routeId, payload) {
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
 
     if (route.status !== "planejada") {
       throw new HttpError(409, "Apenas rotas planejadas podem ser editadas");
     }
 
     if (payload.motoristaId) {
-      await ensureDriverActive(client, userId, payload.motoristaId);
+      await ensureDriverActive(client, actor, payload.motoristaId);
     }
 
     if (payload.veiculoId) {
-      await ensureVehicleAvailable(client, userId, payload.veiculoId);
+      await ensureVehicleAvailable(client, actor, payload.veiculoId);
     }
 
     const fields = [];
-    const values = [userId, routeId];
+    const tenant = buildTenantCondition({ actor, tableAlias: "rotas_operacionais", startIndex: 2 });
+    const values = [routeId, ...tenant.params];
     const mapping = {
       codigo: "codigo",
       motoristaId: "motorista_id",
@@ -500,12 +529,12 @@ async function updateById(userId, routeId, payload) {
     await client.query(
       `UPDATE rotas_operacionais
       SET ${fields.join(", ")}
-      WHERE usuario_id = $1 AND id = $2`,
+      WHERE id = $1 AND ${tenant.condition}`,
       values,
     );
 
-    const updated = await findById(userId, routeId, client);
-    const apoio = await getSupportData(userId, client);
+    const updated = await findById(actor, routeId, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: updated, apoio };
   } catch (error) {
@@ -516,26 +545,32 @@ async function updateById(userId, routeId, payload) {
   }
 }
 
-async function deleteById(userId, routeId) {
+async function deleteById(actor, routeId) {
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
+    const tenant = buildTenantCondition({ actor, tableAlias: "rota_entregas", startIndex: 2 });
 
     if (route.status !== "planejada") {
       throw new HttpError(409, "Apenas rotas planejadas podem ser excluidas");
     }
 
-    await client.query(`DELETE FROM rota_entregas WHERE usuario_id = $1 AND rota_id = $2`, [
-      userId,
-      routeId,
-    ]);
+    await client.query(
+      `DELETE FROM rota_entregas WHERE rota_id = $1 AND ${tenant.condition}`,
+      [routeId, ...tenant.params],
+    );
+    const routeTenant = buildTenantCondition({
+      actor,
+      tableAlias: "rotas_operacionais",
+      startIndex: 2,
+    });
     const result = await client.query(
       `DELETE FROM rotas_operacionais
-      WHERE usuario_id = $1 AND id = $2
+      WHERE id = $1 AND ${routeTenant.condition}
       RETURNING id`,
-      [userId, routeId],
+      [routeId, ...routeTenant.params],
     );
 
     await client.query("COMMIT");
@@ -548,22 +583,25 @@ async function deleteById(userId, routeId) {
   }
 }
 
-async function addDeliveries(userId, routeId, entregaIds) {
+async function addDeliveries(actor, routeId, entregaIds) {
+  const context = normalizeActor(actor);
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
 
     if (route.status !== "planejada") {
       throw new HttpError(409, "Somente rotas planejadas aceitam novas entregas");
     }
 
+    const deliveryTenant = buildTenantCondition({ actor, tableAlias: "entregas", startIndex: 1 });
+    const entregaIdsIndex = deliveryTenant.nextIndex;
     const deliveriesResult = await client.query(
       `SELECT id, codigo, status
       FROM entregas
-      WHERE usuario_id = $1 AND id = ANY($2::uuid[])`,
-      [userId, entregaIds],
+      WHERE ${deliveryTenant.condition} AND id = ANY($${entregaIdsIndex}::uuid[])`,
+      [...deliveryTenant.params, entregaIds],
     );
 
     if (deliveriesResult.rowCount !== entregaIds.length) {
@@ -581,13 +619,15 @@ async function addDeliveries(userId, routeId, entregaIds) {
       );
     }
 
+    const relationDeliveryIdsIndex = context.empresaId ? 2 : 1;
     const activeBindings = await client.query(
       `SELECT d.codigo
       FROM rota_entregas re
       INNER JOIN entregas d ON d.id = re.entrega_id
       WHERE re.entrega_id = ANY($1::uuid[])
-        AND re.ativo = TRUE`,
-      [entregaIds],
+        AND re.ativo = TRUE
+        ${context.empresaId ? "AND (re.empresa_id = $2 OR (re.empresa_id IS NULL AND d.empresa_id = $2))" : ""}`,
+      context.empresaId ? [entregaIds, context.empresaId] : [entregaIds],
     );
 
     if (activeBindings.rowCount > 0) {
@@ -601,12 +641,22 @@ async function addDeliveries(userId, routeId, entregaIds) {
       await client.query(
         `INSERT INTO rota_entregas (usuario_id, rota_id, entrega_id)
         VALUES ($1, $2, $3)`,
-        [userId, routeId, entregaId],
+        [context.userId, routeId, entregaId],
       );
     }
 
-    const updated = await findById(userId, routeId, client);
-    const apoio = await getSupportData(userId, client);
+    if (context.empresaId) {
+      await client.query(
+        `UPDATE rota_entregas
+        SET empresa_id = $1
+        WHERE rota_id = $2
+          AND empresa_id IS NULL`,
+        [context.empresaId, routeId],
+      );
+    }
+
+    const updated = await findById(actor, routeId, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: updated, apoio };
   } catch (error) {
@@ -617,12 +667,13 @@ async function addDeliveries(userId, routeId, entregaIds) {
   }
 }
 
-async function removeDelivery(userId, routeId, entregaId) {
+async function removeDelivery(actor, routeId, entregaId) {
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
+    const tenant = buildTenantCondition({ actor, tableAlias: "rota_entregas", startIndex: 3 });
 
     if (route.status !== "planejada") {
       throw new HttpError(409, "Somente rotas planejadas permitem remover entregas");
@@ -631,20 +682,20 @@ async function removeDelivery(userId, routeId, entregaId) {
     const result = await client.query(
       `UPDATE rota_entregas
       SET ativo = FALSE, desvinculado_em = NOW()
-      WHERE usuario_id = $1
-        AND rota_id = $2
-        AND entrega_id = $3
+      WHERE rota_id = $1
+        AND entrega_id = $2
+        AND ${tenant.condition}
         AND ativo = TRUE
       RETURNING id`,
-      [userId, routeId, entregaId],
+      [routeId, entregaId, ...tenant.params],
     );
 
     if (result.rowCount === 0) {
       throw new HttpError(404, "Entrega nao esta vinculada a esta rota");
     }
 
-    const updated = await findById(userId, routeId, client);
-    const apoio = await getSupportData(userId, client);
+    const updated = await findById(actor, routeId, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: updated, apoio };
   } catch (error) {
@@ -655,23 +706,25 @@ async function removeDelivery(userId, routeId, entregaId) {
   }
 }
 
-async function startRoute(userId, routeId) {
+async function startRoute(actor, routeId) {
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
 
     if (route.status !== "planejada") {
       throw new HttpError(409, "Somente rotas planejadas podem ser iniciadas");
     }
 
+    const relationTenant = buildTenantCondition({ actor, tableAlias: "re", startIndex: 1 });
+    const routeIdIndex = relationTenant.nextIndex;
     const deliveriesResult = await client.query(
       `SELECT d.id, d.codigo, d.status
       FROM rota_entregas re
       INNER JOIN entregas d ON d.id = re.entrega_id
-      WHERE re.usuario_id = $1 AND re.rota_id = $2 AND re.ativo = TRUE`,
-      [userId, routeId],
+      WHERE ${relationTenant.condition} AND re.rota_id = $${routeIdIndex} AND re.ativo = TRUE`,
+      [...relationTenant.params, routeId],
     );
 
     if (deliveriesResult.rowCount === 0) {
@@ -689,49 +742,59 @@ async function startRoute(userId, routeId) {
       );
     }
 
-    await ensureDriverActive(client, userId, route.motoristaId);
-    await ensureVehicleAvailable(client, userId, route.veiculoId);
+    await ensureDriverActive(client, actor, route.motoristaId);
+    await ensureVehicleAvailable(client, actor, route.veiculoId);
 
+    const routeTenant = buildTenantCondition({ actor, tableAlias: "rotas_operacionais", startIndex: 2 });
     const overlaps = await client.query(
       `SELECT codigo
       FROM rotas_operacionais
-      WHERE usuario_id = $1
-        AND id <> $2
+      WHERE ${routeTenant.condition}
+        AND id <> $1
         AND status = 'em_andamento'
-        AND (motorista_id = $3 OR veiculo_id = $4)
+        AND (motorista_id = $${routeTenant.nextIndex} OR veiculo_id = $${routeTenant.nextIndex + 1})
       LIMIT 1`,
-      [userId, routeId, route.motoristaId, route.veiculoId],
+      [routeId, ...routeTenant.params, route.motoristaId, route.veiculoId],
     );
 
     if (overlaps.rowCount > 0) {
       throw new HttpError(409, "Motorista ou veiculo ja estao em outra rota em andamento");
     }
 
+    const routeUpdateTenant = buildTenantCondition({
+      actor,
+      tableAlias: "rotas_operacionais",
+      startIndex: 2,
+    });
     await client.query(
       `UPDATE rotas_operacionais
       SET status = 'em_andamento', atualizado_em = NOW()
-      WHERE usuario_id = $1 AND id = $2`,
-      [userId, routeId],
+      WHERE id = $1 AND ${routeUpdateTenant.condition}`,
+      [routeId, ...routeUpdateTenant.params],
     );
+    const deliveryTenant = buildTenantCondition({ actor, tableAlias: "rota_entregas", startIndex: 2 });
     await client.query(
       `UPDATE entregas
       SET status = 'em_rota', atualizado_em = NOW()
       WHERE id IN (
         SELECT entrega_id
         FROM rota_entregas
-        WHERE usuario_id = $1 AND rota_id = $2 AND ativo = TRUE
+        WHERE ${deliveryTenant.condition}
+          AND rota_id = $1
+          AND ativo = TRUE
       )`,
-      [userId, routeId],
+      [routeId, ...deliveryTenant.params],
     );
+    const vehicleTenant = buildTenantCondition({ actor, tableAlias: "veiculos", startIndex: 2 });
     await client.query(
       `UPDATE veiculos
       SET status = 'em_rota', atualizado_em = NOW()
-      WHERE usuario_id = $1 AND id = $2`,
-      [userId, route.veiculoId],
+      WHERE id = $1 AND ${vehicleTenant.condition}`,
+      [route.veiculoId, ...vehicleTenant.params],
     );
 
-    const updated = await findById(userId, routeId, client);
-    const apoio = await getSupportData(userId, client);
+    const updated = await findById(actor, routeId, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: updated, apoio };
   } catch (error) {
@@ -742,48 +805,57 @@ async function startRoute(userId, routeId) {
   }
 }
 
-async function completeRoute(userId, routeId) {
+async function completeRoute(actor, routeId) {
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
 
     if (route.status !== "em_andamento") {
       throw new HttpError(409, "Somente rotas em andamento podem ser concluidas");
     }
 
+    const routeTenant = buildTenantCondition({
+      actor,
+      tableAlias: "rotas_operacionais",
+      startIndex: 2,
+    });
     await client.query(
       `UPDATE rotas_operacionais
       SET status = 'concluida', atualizado_em = NOW()
-      WHERE usuario_id = $1 AND id = $2`,
-      [userId, routeId],
+      WHERE id = $1 AND ${routeTenant.condition}`,
+      [routeId, ...routeTenant.params],
     );
+    const relationTenant = buildTenantCondition({ actor, tableAlias: "rota_entregas", startIndex: 2 });
     await client.query(
       `UPDATE entregas
       SET status = 'entregue', atualizado_em = NOW()
       WHERE id IN (
         SELECT entrega_id
         FROM rota_entregas
-        WHERE usuario_id = $1 AND rota_id = $2 AND ativo = TRUE
+        WHERE ${relationTenant.condition}
+          AND rota_id = $1
+          AND ativo = TRUE
       )`,
-      [userId, routeId],
+      [routeId, ...relationTenant.params],
     );
     await client.query(
       `UPDATE rota_entregas
       SET ativo = FALSE, desvinculado_em = NOW()
-      WHERE usuario_id = $1 AND rota_id = $2 AND ativo = TRUE`,
-      [userId, routeId],
+      WHERE rota_id = $1 AND ${relationTenant.condition} AND ativo = TRUE`,
+      [routeId, ...relationTenant.params],
     );
+    const vehicleTenant = buildTenantCondition({ actor, tableAlias: "veiculos", startIndex: 2 });
     await client.query(
       `UPDATE veiculos
       SET status = 'disponivel', atualizado_em = NOW()
-      WHERE usuario_id = $1 AND id = $2`,
-      [userId, route.veiculoId],
+      WHERE id = $1 AND ${vehicleTenant.condition}`,
+      [route.veiculoId, ...vehicleTenant.params],
     );
 
-    const updated = await findById(userId, routeId, client);
-    const apoio = await getSupportData(userId, client);
+    const updated = await findById(actor, routeId, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: updated, apoio };
   } catch (error) {
@@ -794,53 +866,63 @@ async function completeRoute(userId, routeId) {
   }
 }
 
-async function cancelRoute(userId, routeId) {
+async function cancelRoute(actor, routeId) {
   const client = await database.getClient();
 
   try {
     await client.query("BEGIN");
-    const route = await ensureRouteExistsForUpdate(client, userId, routeId);
+    const route = await ensureRouteExistsForUpdate(client, actor, routeId);
 
     if (!["planejada", "em_andamento"].includes(route.status)) {
       throw new HttpError(409, "Esta rota nao pode mais ser cancelada");
     }
 
+    const routeTenant = buildTenantCondition({
+      actor,
+      tableAlias: "rotas_operacionais",
+      startIndex: 2,
+    });
     await client.query(
       `UPDATE rotas_operacionais
       SET status = 'cancelada', atualizado_em = NOW()
-      WHERE usuario_id = $1 AND id = $2`,
-      [userId, routeId],
+      WHERE id = $1 AND ${routeTenant.condition}`,
+      [routeId, ...routeTenant.params],
     );
 
     if (route.status === "em_andamento") {
+      const relationTenant = buildTenantCondition({ actor, tableAlias: "rota_entregas", startIndex: 2 });
       await client.query(
         `UPDATE entregas
         SET status = 'em_transito', atualizado_em = NOW()
         WHERE id IN (
           SELECT entrega_id
           FROM rota_entregas
-          WHERE usuario_id = $1 AND rota_id = $2 AND ativo = TRUE
+          WHERE ${relationTenant.condition}
+            AND rota_id = $1
+            AND ativo = TRUE
         )
           AND status = 'em_rota'`,
-        [userId, routeId],
+        [routeId, ...relationTenant.params],
       );
+      const vehicleTenant = buildTenantCondition({ actor, tableAlias: "veiculos", startIndex: 2 });
       await client.query(
         `UPDATE veiculos
         SET status = 'disponivel', atualizado_em = NOW()
-        WHERE usuario_id = $1 AND id = $2`,
-        [userId, route.veiculoId],
+        WHERE id = $1 AND ${vehicleTenant.condition}`,
+        [route.veiculoId, ...vehicleTenant.params],
       );
     }
 
+    const relationTenant = buildTenantCondition({ actor, tableAlias: "rota_entregas", startIndex: 2 });
     await client.query(
       `UPDATE rota_entregas
       SET ativo = FALSE, desvinculado_em = NOW()
-      WHERE usuario_id = $1 AND rota_id = $2 AND ativo = TRUE`,
-      [userId, routeId],
+      WHERE rota_id = $1 AND ${relationTenant.condition} AND ativo = TRUE`,
+      [routeId, ...relationTenant.params],
     );
 
-    const updated = await findById(userId, routeId, client);
-    const apoio = await getSupportData(userId, client);
+    const updated = await findById(actor, routeId, client);
+    const apoio = await getSupportData(actor, client);
     await client.query("COMMIT");
     return { rota: updated, apoio };
   } catch (error) {

@@ -34,13 +34,13 @@ function ensureFound(driver) {
 }
 
 async function list(req, res) {
-  const motoristas = await repository.listByUserId(req.user.id);
+  const motoristas = await repository.listByUserId(req.user);
   res.json({ resumo: buildSummary(motoristas), motoristas });
 }
 
 async function show(req, res) {
   ensureValidUuid(req.params.id);
-  const motorista = await repository.findById(req.user.id, req.params.id);
+  const motorista = await repository.findById(req.user, req.params.id);
   ensureFound(motorista);
   res.json({ motorista });
 }
@@ -51,7 +51,7 @@ async function create(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const motorista = await repository.create(req.user.id, data);
+  const motorista = await repository.create(req.user, data);
   res.status(201).json({ mensagem: "Motorista cadastrado com sucesso", motorista });
 }
 
@@ -62,7 +62,7 @@ async function update(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const motorista = await repository.updateById(req.user.id, req.params.id, data);
+  const motorista = await repository.updateById(req.user, req.params.id, data);
   ensureFound(motorista);
   res.json({ mensagem: "Motorista atualizado com sucesso", motorista });
 }
@@ -75,7 +75,7 @@ async function updateStatus(req, res) {
   }
 
   const motorista = await repository.updateStatusById(
-    req.user.id,
+    req.user,
     req.params.id,
     data.status,
   );
@@ -85,7 +85,7 @@ async function updateStatus(req, res) {
 
 async function remove(req, res) {
   ensureValidUuid(req.params.id);
-  const motorista = await repository.deleteById(req.user.id, req.params.id);
+  const motorista = await repository.deleteById(req.user, req.params.id);
   ensureFound(motorista);
   res.json({ mensagem: "Motorista excluido com sucesso" });
 }

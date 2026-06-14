@@ -1,11 +1,13 @@
 const database = require("../config/database");
+const { normalizeActor } = require("./tenantContext");
 
-async function findByUserId(userId) {
+async function findByUserId(actor) {
+  const context = normalizeActor(actor);
   await database.query(
-    `INSERT INTO configuracoes_usuario (usuario_id)
-     VALUES ($1)
+    `INSERT INTO configuracoes_usuario (usuario_id, empresa_id)
+     VALUES ($1, $2)
      ON CONFLICT (usuario_id) DO NOTHING`,
-    [userId],
+    [context.userId, context.empresaId],
   );
 
   const result = await database.query(
@@ -17,7 +19,7 @@ async function findByUserId(userId) {
       atualizado_em AS "atualizadoEm"
     FROM configuracoes_usuario
     WHERE usuario_id = $1`,
-    [userId],
+    [context.userId],
   );
 
   return result.rows[0] || null;

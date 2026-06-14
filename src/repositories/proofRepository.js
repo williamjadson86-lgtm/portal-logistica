@@ -2,6 +2,7 @@ const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
 const { USER_ROLES } = require("../config/permissions");
 const { findLinkedDriverId } = require("./driverAccessRepository");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapProof(row) {
   if (!row) {
@@ -27,9 +28,10 @@ function mapProof(row) {
   };
 }
 
-async function listByUserId(userId, filters = {}) {
-  const values = [userId];
-  const conditions = ["c.usuario_id = $1"];
+async function listByUserId(actor, filters = {}) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "e" });
+  const values = [...tenant.params];
+  const conditions = [tenant.condition];
 
   if (filters.entregaId) {
     values.push(filters.entregaId);
@@ -71,7 +73,7 @@ async function listByUserId(userId, filters = {}) {
 
 async function listForUser(user, filters = {}) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return listByUserId(user.id, filters);
+    return listByUserId(user, filters);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -129,7 +131,9 @@ async function listForUser(user, filters = {}) {
   return result.rows.map(mapProof);
 }
 
-async function findById(userId, proofId) {
+async function findById(actor, proofId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "e" });
+  const proofIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       c.id,
@@ -150,8 +154,8 @@ async function findById(userId, proofId) {
     FROM comprovantes c
     INNER JOIN entregas e ON e.id = c.entrega_id
     INNER JOIN usuarios u ON u.id = c.usuario_id
-    WHERE c.usuario_id = $1 AND c.id = $2`,
-    [userId, proofId],
+    WHERE ${tenant.condition} AND c.id = $${proofIdIndex}`,
+    [...tenant.params, proofId],
   );
 
   return mapProof(result.rows[0]);
@@ -159,19 +163,21 @@ async function findById(userId, proofId) {
 
 async function findByIdForUser(user, proofId) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return findById(user.id, proofId);
+    return findById(user, proofId);
   }
 
   const proofs = await listForUser(user, { ativo: true });
   return proofs.find((proof) => proof.id === proofId) || null;
 }
 
-async function findDeliveryById(userId, entregaId) {
+async function findDeliveryById(actor, entregaId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "entregas" });
+  const entregaIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT id, codigo, cliente, status
     FROM entregas
-    WHERE usuario_id = $1 AND id = $2`,
-    [userId, entregaId],
+    WHERE ${tenant.condition} AND id = $${entregaIdIndex}`,
+    [...tenant.params, entregaId],
   );
 
   return result.rows[0] || null;
@@ -179,7 +185,7 @@ async function findDeliveryById(userId, entregaId) {
 
 async function findDeliveryByIdForUser(user, entregaId) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return findDeliveryById(user.id, entregaId);
+    return findDeliveryById(user, entregaId);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -205,7 +211,8 @@ async function findDeliveryByIdForUser(user, entregaId) {
   return result.rows[0] || null;
 }
 
-async function listDeliveriesForProofs(userId) {
+async function listDeliveriesForProofs(actor) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "entregas" });
   const result = await database.query(
     `SELECT
       id,
@@ -213,9 +220,9 @@ async function listDeliveriesForProofs(userId) {
       cliente,
       status
     FROM entregas
-    WHERE usuario_id = $1
+    WHERE ${tenant.condition}
     ORDER BY criado_em DESC`,
-    [userId],
+    tenant.params,
   );
 
   return result.rows;
@@ -223,7 +230,7 @@ async function listDeliveriesForProofs(userId) {
 
 async function listDeliveriesForUser(user) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return listDeliveriesForProofs(user.id);
+    return listDeliveriesForProofs(user);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -253,8 +260,9 @@ async function listDeliveriesForUser(user) {
   return result.rows;
 }
 
-async function create(userId, entregaId, payload) {
-  const delivery = await findDeliveryById(userId, entregaId);
+async function create(actor, entregaId, payload) {
+  const context = normalizeActor(actor);
+  const delivery = await findDeliveryById(actor, entregaId);
 
   if (!delivery) {
     throw new HttpError(404, "Entrega nao encontrada");
@@ -271,6 +279,7 @@ async function create(userId, entregaId, payload) {
     `INSERT INTO comprovantes (
       entrega_id,
       usuario_id,
+      empresa_id,
       tipo,
       arquivo_nome,
       arquivo_caminho,
@@ -279,7 +288,7 @@ async function create(userId, entregaId, payload) {
       observacao,
       ativo
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
     RETURNING
       id,
       entrega_id AS "entregaId",
@@ -295,7 +304,8 @@ async function create(userId, entregaId, payload) {
       atualizado_em AS "atualizadoEm"`,
     [
       entregaId,
-      userId,
+      context.userId,
+      context.empresaId,
       payload.tipo,
       payload.arquivoNome,
       payload.arquivoCaminho,
@@ -305,10 +315,11 @@ async function create(userId, entregaId, payload) {
     ],
   );
 
-  return findById(userId, result.rows[0].id);
+  return findById(actor, result.rows[0].id);
 }
 
 async function createForUser(user, entregaId, payload) {
+  const context = normalizeActor(user);
   const delivery = await findDeliveryByIdForUser(user, entregaId);
 
   if (!delivery) {
@@ -326,6 +337,7 @@ async function createForUser(user, entregaId, payload) {
     `INSERT INTO comprovantes (
       entrega_id,
       usuario_id,
+      empresa_id,
       tipo,
       arquivo_nome,
       arquivo_caminho,
@@ -334,11 +346,12 @@ async function createForUser(user, entregaId, payload) {
       observacao,
       ativo
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
     RETURNING id`,
     [
       entregaId,
-      user.id,
+      context.userId,
+      context.empresaId,
       payload.tipo,
       payload.arquivoNome,
       payload.arquivoCaminho,
@@ -351,9 +364,10 @@ async function createForUser(user, entregaId, payload) {
   return findByIdForUser(user, result.rows[0].id);
 }
 
-async function updateById(userId, proofId, payload) {
+async function updateById(actor, proofId, payload) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "comprovantes", startIndex: 2 });
   const fields = [];
-  const values = [userId, proofId];
+  const values = [proofId, ...tenant.params];
   const mapping = {
     tipo: "tipo",
     observacao: "observacao",
@@ -373,20 +387,21 @@ async function updateById(userId, proofId, payload) {
   await database.query(
     `UPDATE comprovantes
     SET ${fields.join(", ")}
-    WHERE usuario_id = $1 AND id = $2`,
+    WHERE id = $1 AND ${tenant.condition}`,
     values,
   );
 
-  return findById(userId, proofId);
+  return findById(actor, proofId);
 }
 
-async function deactivateById(userId, proofId) {
+async function deactivateById(actor, proofId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "comprovantes", startIndex: 2 });
   const result = await database.query(
     `UPDATE comprovantes
     SET ativo = FALSE, atualizado_em = NOW()
-    WHERE usuario_id = $1 AND id = $2 AND ativo = TRUE
+    WHERE id = $1 AND ${tenant.condition} AND ativo = TRUE
     RETURNING id`,
-    [userId, proofId],
+    [proofId, ...tenant.params],
   );
 
   return result.rows[0] || null;

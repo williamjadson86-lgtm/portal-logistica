@@ -1,4 +1,5 @@
 const database = require("../config/database");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapEvent(row) {
   if (!row) {
@@ -22,11 +23,12 @@ async function appendEvent(event, client = database) {
     `INSERT INTO entrega_eventos (
       entrega_id,
       usuario_id,
+      empresa_id,
       tipo_evento,
       descricao,
       dados
     )
-    VALUES ($1, $2, $3, $4, $5)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING
       id,
       entrega_id AS "entregaId",
@@ -38,6 +40,7 @@ async function appendEvent(event, client = database) {
     [
       event.entregaId,
       event.usuarioId || null,
+      event.empresaId || null,
       event.tipoEvento,
       event.descricao,
       event.dados ? JSON.stringify(event.dados) : null,
@@ -57,7 +60,9 @@ async function appendMany(events, client = database) {
   return created;
 }
 
-async function listByDeliveryId(userId, entregaId) {
+async function listByDeliveryId(actor, entregaId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "e" });
+  const entregaIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       ee.id,
@@ -71,10 +76,10 @@ async function listByDeliveryId(userId, entregaId) {
     FROM entrega_eventos ee
     INNER JOIN entregas e ON e.id = ee.entrega_id
     LEFT JOIN usuarios u ON u.id = ee.usuario_id
-    WHERE e.usuario_id = $1
-      AND ee.entrega_id = $2
+    WHERE ${tenant.condition}
+      AND ee.entrega_id = $${entregaIdIndex}
     ORDER BY ee.criado_em DESC, ee.id DESC`,
-    [userId, entregaId],
+    [...tenant.params, entregaId],
   );
 
   return result.rows.map(mapEvent);

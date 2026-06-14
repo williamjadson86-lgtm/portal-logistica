@@ -2,6 +2,7 @@ const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
 const { USER_ROLES } = require("../config/permissions");
 const { findLinkedDriverId } = require("./driverAccessRepository");
+const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapLinkedClient(row) {
   if (!row?.clienteId) {
@@ -64,18 +65,20 @@ function mapDelivery(row) {
   };
 }
 
-async function findClientById(userId, clientId, client = database) {
+async function findClientById(actor, clientId, client = database) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "c" });
+  const clientIdIndex = tenant.nextIndex;
   const result = await client.query(
     `SELECT id, nome, documento, status
-    FROM clientes
-    WHERE usuario_id = $1 AND id = $2`,
-    [userId, clientId],
+    FROM clientes c
+    WHERE ${tenant.condition} AND id = $${clientIdIndex}`,
+    [...tenant.params, clientId],
   );
 
   return result.rows[0] || null;
 }
 
-async function resolveClientReference(userId, payload, options = {}) {
+async function resolveClientReference(actor, payload, options = {}) {
   const { client = database, fallbackClientName = null } = options;
 
   if (Object.hasOwn(payload, "clienteId")) {
@@ -86,7 +89,7 @@ async function resolveClientReference(userId, payload, options = {}) {
       };
     }
 
-    const linkedClient = await findClientById(userId, payload.clienteId, client);
+    const linkedClient = await findClientById(actor, payload.clienteId, client);
     if (!linkedClient) {
       throw new HttpError(404, "Cliente nao encontrado");
     }
@@ -131,7 +134,8 @@ function buildDeliverySelect() {
       d.atualizado_em AS "atualizadoEm"`;
 }
 
-async function getDashboardSummary(userId) {
+async function getDashboardSummary(actor) {
+  const tenant = buildTenantCondition({ actor });
   const result = await database.query(
     `SELECT
       COUNT(*)::int AS total,
@@ -139,8 +143,8 @@ async function getDashboardSummary(userId) {
       COUNT(*) FILTER (WHERE status = 'entregue')::int AS entregues,
       COUNT(*) FILTER (WHERE status = 'pendente')::int AS pendentes
     FROM entregas
-    WHERE usuario_id = $1`,
-    [userId],
+    WHERE ${tenant.condition}`,
+    tenant.params,
   );
 
   return result.rows[0];
@@ -148,7 +152,7 @@ async function getDashboardSummary(userId) {
 
 async function getDashboardSummaryForUser(user) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return getDashboardSummary(user.id);
+    return getDashboardSummary(user);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -161,6 +165,8 @@ async function getDashboardSummaryForUser(user) {
     };
   }
 
+  const tenant = buildTenantCondition({ actor: user, tableAlias: "d" });
+  const driverIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       COUNT(DISTINCT d.id)::int AS total,
@@ -170,23 +176,24 @@ async function getDashboardSummaryForUser(user) {
     FROM entregas d
     INNER JOIN rota_entregas re ON re.entrega_id = d.id
     INNER JOIN rotas_operacionais r ON r.id = re.rota_id
-    WHERE d.usuario_id = $1
-      AND r.motorista_id = $2`,
-    [user.id, driverId],
+    WHERE ${tenant.condition}
+      AND r.motorista_id = $${driverIdIndex}`,
+    [...tenant.params, driverId],
   );
 
   return result.rows[0];
 }
 
-async function listByUserId(userId) {
+async function listByUserId(actor) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "d" });
   const result = await database.query(
     `${buildDeliverySelect()}
     FROM entregas d
     LEFT JOIN clientes c
       ON c.id = d.cliente_id
-    WHERE d.usuario_id = $1
+    WHERE ${tenant.condition}
     ORDER BY d.previsao_entrega ASC NULLS LAST, d.criado_em DESC`,
-    [userId],
+    tenant.params,
   );
 
   return result.rows.map(mapDelivery);
@@ -194,7 +201,7 @@ async function listByUserId(userId) {
 
 async function listForUser(user) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return listByUserId(user.id);
+    return listByUserId(user);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -202,27 +209,31 @@ async function listForUser(user) {
     return [];
   }
 
+  const tenant = buildTenantCondition({ actor: user, tableAlias: "d" });
+  const driverIdIndex = tenant.nextIndex;
   const result = await database.query(
     `${buildDeliverySelect()}
     FROM entregas d
     LEFT JOIN clientes c
       ON c.id = d.cliente_id
-    WHERE d.usuario_id = $1
+    WHERE ${tenant.condition}
       AND EXISTS (
         SELECT 1
         FROM rota_entregas re
         INNER JOIN rotas_operacionais r ON r.id = re.rota_id
         WHERE re.entrega_id = d.id
-          AND r.motorista_id = $2
+          AND r.motorista_id = $${driverIdIndex}
       )
     ORDER BY d.previsao_entrega ASC NULLS LAST, d.criado_em DESC`,
-    [user.id, driverId],
+    [...tenant.params, driverId],
   );
 
   return result.rows.map(mapDelivery);
 }
 
-async function findById(userId, deliveryId) {
+async function findById(actor, deliveryId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "d" });
+  const deliveryIdIndex = tenant.nextIndex;
   const result = await database.query(
     `SELECT
       d.id,
@@ -264,8 +275,8 @@ async function findById(userId, deliveryId) {
       ON m.id = r.motorista_id
     LEFT JOIN veiculos v
       ON v.id = r.veiculo_id
-    WHERE d.usuario_id = $1 AND d.id = $2`,
-    [userId, deliveryId],
+    WHERE ${tenant.condition} AND d.id = $${deliveryIdIndex}`,
+    [...tenant.params, deliveryId],
   );
 
   return mapDelivery(result.rows[0]);
@@ -273,7 +284,7 @@ async function findById(userId, deliveryId) {
 
 async function findByIdForUser(user, deliveryId) {
   if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
-    return findById(user.id, deliveryId);
+    return findById(user, deliveryId);
   }
 
   const driverId = await findLinkedDriverId(user);
@@ -281,6 +292,9 @@ async function findByIdForUser(user, deliveryId) {
     return null;
   }
 
+  const tenant = buildTenantCondition({ actor: user, tableAlias: "d" });
+  const deliveryIdIndex = tenant.nextIndex;
+  const driverIdIndex = tenant.nextIndex + 1;
   const result = await database.query(
     `SELECT
       d.id,
@@ -321,23 +335,25 @@ async function findByIdForUser(user, deliveryId) {
       ON m.id = r.motorista_id
     LEFT JOIN veiculos v
       ON v.id = r.veiculo_id
-    WHERE d.usuario_id = $1
-      AND d.id = $2
-      AND r.motorista_id = $3
+    WHERE ${tenant.condition}
+      AND d.id = $${deliveryIdIndex}
+      AND r.motorista_id = $${driverIdIndex}
     ORDER BY re.ativo DESC
     LIMIT 1`,
-    [user.id, deliveryId, driverId],
+    [...tenant.params, deliveryId, driverId],
   );
 
   return mapDelivery(result.rows[0]);
 }
 
-async function create(userId, payload) {
-  const resolvedClient = await resolveClientReference(userId, payload);
+async function create(actor, payload) {
+  const context = normalizeActor(actor);
+  const resolvedClient = await resolveClientReference(actor, payload);
 
   const result = await database.query(
     `INSERT INTO entregas (
       usuario_id,
+      empresa_id,
       codigo,
       cliente_id,
       cliente,
@@ -351,10 +367,11 @@ async function create(userId, payload) {
       valor_frete,
       observacoes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING id`,
     [
-      userId,
+      context.userId,
+      context.empresaId,
       payload.codigo,
       resolvedClient.clienteId || null,
       resolvedClient.cliente,
@@ -370,21 +387,22 @@ async function create(userId, payload) {
     ],
   );
 
-  return findById(userId, result.rows[0].id);
+  return findById(actor, result.rows[0].id);
 }
 
-async function updateById(userId, deliveryId, payload) {
-  const current = await findById(userId, deliveryId);
+async function updateById(actor, deliveryId, payload) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "entregas", startIndex: 2 });
+  const current = await findById(actor, deliveryId);
   if (!current) {
     return null;
   }
 
-  const resolvedClient = await resolveClientReference(userId, payload, {
+  const resolvedClient = await resolveClientReference(actor, payload, {
     fallbackClientName: current.cliente,
   });
 
   const fields = [];
-  const values = [userId, deliveryId];
+  const values = [deliveryId, ...tenant.params];
   const mapping = {
     codigo: "codigo",
     origem: "origem",
@@ -429,7 +447,7 @@ async function updateById(userId, deliveryId, payload) {
   const result = await database.query(
     `UPDATE entregas
     SET ${fields.join(", ")}
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING id`,
     values,
   );
@@ -438,31 +456,33 @@ async function updateById(userId, deliveryId, payload) {
     return null;
   }
 
-  return findById(userId, deliveryId);
+  return findById(actor, deliveryId);
 }
 
-async function updateStatusById(userId, deliveryId, status) {
+async function updateStatusById(actor, deliveryId, status) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "entregas", startIndex: 3 });
   const result = await database.query(
     `UPDATE entregas
-    SET status = $3, atualizado_em = NOW()
-    WHERE usuario_id = $1 AND id = $2
+    SET status = $2, atualizado_em = NOW()
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING id`,
-    [userId, deliveryId, status],
+    [deliveryId, status, ...tenant.params],
   );
 
   if (result.rowCount === 0) {
     return null;
   }
 
-  return findById(userId, deliveryId);
+  return findById(actor, deliveryId);
 }
 
-async function deleteById(userId, deliveryId) {
+async function deleteById(actor, deliveryId) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "entregas", startIndex: 2 });
   const result = await database.query(
     `DELETE FROM entregas
-    WHERE usuario_id = $1 AND id = $2
+    WHERE id = $1 AND ${tenant.condition}
     RETURNING id`,
-    [userId, deliveryId],
+    [deliveryId, ...tenant.params],
   );
 
   return result.rows[0] || null;

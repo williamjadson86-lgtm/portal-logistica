@@ -330,7 +330,7 @@ async function listByClient(req, res) {
     throw new HttpError(400, "Filtros invalidos", errors);
   }
 
-  res.json(await loadClientReport(req.user.id, data));
+  res.json(await loadClientReport(req.user, data));
 }
 
 async function exportClientsCsv(req, res) {
@@ -339,7 +339,7 @@ async function exportClientsCsv(req, res) {
     throw new HttpError(400, "Filtros invalidos", errors);
   }
 
-  const report = await loadClientReport(req.user.id, data);
+  const report = await loadClientReport(req.user, data);
   const csv = buildClientsCsv(report.clientes);
 
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -353,7 +353,7 @@ async function exportClientsXlsx(req, res) {
     throw new HttpError(400, "Filtros invalidos", errors);
   }
 
-  const report = await loadClientReport(req.user.id, data);
+  const report = await loadClientReport(req.user, data);
   const buffer = await buildClientsWorkbook(report);
 
   res.setHeader(
@@ -369,7 +369,7 @@ async function showClientDetail(req, res) {
     throw new HttpError(400, "Identificador de cliente invalido");
   }
 
-  const detail = await reportRepository.getClientReportDetails(req.user.id, req.params.id);
+  const detail = await reportRepository.getClientReportDetails(req.user, req.params.id);
   if (!detail) {
     throw new HttpError(404, "Cliente nao encontrado");
   }

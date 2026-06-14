@@ -6,7 +6,7 @@ function page(_req, res) {
 }
 
 async function data(req, res) {
-  const documents = await repository.listByUserId(req.user.id);
+  const documents = await repository.listByUserId(req.user);
 
   res.json({
     usuario: req.user,

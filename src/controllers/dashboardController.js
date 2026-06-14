@@ -9,7 +9,7 @@ async function getDashboard(req, res) {
     throw new HttpError(400, "Dados invalidos", errors);
   }
 
-  const dashboard = await repository.getOperationalDashboard(req.user.id, data);
+  const dashboard = await repository.getOperationalDashboard(req.user, data);
   res.json(dashboard);
 }
 
