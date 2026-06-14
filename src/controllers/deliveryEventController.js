@@ -12,7 +12,7 @@ function ensureValidUuid(deliveryId) {
 async function list(req, res) {
   ensureValidUuid(req.params.id);
 
-  const delivery = await deliveryRepository.findById(req.user.id, req.params.id);
+  const delivery = await deliveryRepository.findByIdForUser(req.user, req.params.id);
   if (!delivery) {
     throw new HttpError(404, "Entrega nao encontrada");
   }

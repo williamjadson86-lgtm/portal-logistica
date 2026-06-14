@@ -10,10 +10,10 @@ const app = require("../src/app");
 
 const originalRepositories = {
   findById: userRepository.findById,
-  listByUserId: routePlanningRepository.listByUserId,
-  getDashboardSummary: routePlanningRepository.getDashboardSummary,
-  getSupportData: routePlanningRepository.getSupportData,
-  findRouteById: routePlanningRepository.findById,
+  listForUser: routePlanningRepository.listForUser,
+  getDashboardSummaryForUser: routePlanningRepository.getDashboardSummaryForUser,
+  getSupportDataForUser: routePlanningRepository.getSupportDataForUser,
+  findRouteByIdForUser: routePlanningRepository.findByIdForUser,
   create: routePlanningRepository.create,
   updateById: routePlanningRepository.updateById,
   deleteById: routePlanningRepository.deleteById,
@@ -27,10 +27,12 @@ const originalRepositories = {
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
-  routePlanningRepository.listByUserId = originalRepositories.listByUserId;
-  routePlanningRepository.getDashboardSummary = originalRepositories.getDashboardSummary;
-  routePlanningRepository.getSupportData = originalRepositories.getSupportData;
-  routePlanningRepository.findById = originalRepositories.findRouteById;
+  routePlanningRepository.listForUser = originalRepositories.listForUser;
+  routePlanningRepository.getDashboardSummaryForUser =
+    originalRepositories.getDashboardSummaryForUser;
+  routePlanningRepository.getSupportDataForUser =
+    originalRepositories.getSupportDataForUser;
+  routePlanningRepository.findByIdForUser = originalRepositories.findRouteByIdForUser;
   routePlanningRepository.create = originalRepositories.create;
   routePlanningRepository.updateById = originalRepositories.updateById;
   routePlanningRepository.deleteById = originalRepositories.deleteById;
@@ -131,14 +133,14 @@ test.afterEach(() => {
 
 test("lista rotas autenticadas", async () => {
   mockAuthenticatedUser();
-  routePlanningRepository.listByUserId = async () => [createRoute()];
-  routePlanningRepository.getDashboardSummary = async () => ({
+  routePlanningRepository.listForUser = async () => [createRoute()];
+  routePlanningRepository.getDashboardSummaryForUser = async () => ({
     total: 1,
     planejadas: 1,
     emAndamento: 0,
     concluidas: 0,
   });
-  routePlanningRepository.getSupportData = async () => createSupport();
+  routePlanningRepository.getSupportDataForUser = async () => createSupport();
 
   const response = await request(app)
     .get("/api/rotas")
@@ -175,8 +177,8 @@ test("cria rota com payload valido", async () => {
 
 test("visualiza detalhes da rota", async () => {
   mockAuthenticatedUser();
-  routePlanningRepository.findById = async () => createRoute();
-  routePlanningRepository.getSupportData = async () => createSupport();
+  routePlanningRepository.findByIdForUser = async () => createRoute();
+  routePlanningRepository.getSupportDataForUser = async () => createSupport();
 
   const response = await request(app)
     .get("/api/rotas/e2471252-cd69-4033-a2be-3c5091cdb261")

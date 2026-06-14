@@ -34,9 +34,9 @@ async function registerDeliveryEvents(userId, events) {
 
 async function list(req, res) {
   const [rotas, resumo, apoio] = await Promise.all([
-    repository.listByUserId(req.user.id),
-    repository.getDashboardSummary(req.user.id),
-    repository.getSupportData(req.user.id),
+    repository.listForUser(req.user),
+    repository.getDashboardSummaryForUser(req.user),
+    repository.getSupportDataForUser(req.user),
   ]);
 
   res.json({
@@ -53,13 +53,13 @@ async function list(req, res) {
 
 async function show(req, res) {
   ensureValidUuid(req.params.id, "rota");
-  const rota = await repository.findById(req.user.id, req.params.id);
+  const rota = await repository.findByIdForUser(req.user, req.params.id);
 
   if (!rota) {
     throw new HttpError(404, "Rota nao encontrada");
   }
 
-  const apoio = await repository.getSupportData(req.user.id);
+  const apoio = await repository.getSupportDataForUser(req.user);
   res.json({ rota, apoio });
 }
 

@@ -1,4 +1,4 @@
-const USER_TYPES = ["colaborador", "motorista", "operador", "administrador"];
+const USER_TYPES = ["colaborador", "motorista", "operador", "financeiro", "administrador"];
 
 function onlyDigits(value) {
   return String(value || "").replace(/\D/g, "");

@@ -10,13 +10,13 @@ const app = require("../src/app");
 
 const originalRepositories = {
   findUserById: userRepository.findById,
-  findDeliveryById: deliveryRepository.findById,
+  findDeliveryByIdForUser: deliveryRepository.findByIdForUser,
   listEventsByDeliveryId: deliveryEventRepository.listByDeliveryId,
 };
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findUserById;
-  deliveryRepository.findById = originalRepositories.findDeliveryById;
+  deliveryRepository.findByIdForUser = originalRepositories.findDeliveryByIdForUser;
   deliveryEventRepository.listByDeliveryId = originalRepositories.listEventsByDeliveryId;
 }
 
@@ -51,7 +51,7 @@ test.afterEach(() => {
 
 test("listagem da timeline da entrega retorna eventos autenticada", async () => {
   mockAuthenticatedUser();
-  deliveryRepository.findById = async () => ({
+  deliveryRepository.findByIdForUser = async () => ({
     id: "ab60f6d4-4a09-4b33-9afd-8f57cb44e3f7",
     codigo: "ENT-100",
     cliente: "Acme",

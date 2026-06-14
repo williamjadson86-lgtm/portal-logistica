@@ -14,8 +14,8 @@ const originalRepository = {
   findByEmail: repository.findByEmail,
   findByMatricula: repository.findByMatricula,
   findById: repository.findById,
-  getDashboardSummary: deliveryRepository.getDashboardSummary,
-  getRouteDashboardSummary: routePlanningRepository.getDashboardSummary,
+  getDashboardSummaryForUser: deliveryRepository.getDashboardSummaryForUser,
+  getRouteDashboardSummaryForUser: routePlanningRepository.getDashboardSummaryForUser,
 };
 
 function restoreRepository() {
@@ -23,9 +23,10 @@ function restoreRepository() {
   repository.findByEmail = originalRepository.findByEmail;
   repository.findByMatricula = originalRepository.findByMatricula;
   repository.findById = originalRepository.findById;
-  deliveryRepository.getDashboardSummary = originalRepository.getDashboardSummary;
-  routePlanningRepository.getDashboardSummary =
-    originalRepository.getRouteDashboardSummary;
+  deliveryRepository.getDashboardSummaryForUser =
+    originalRepository.getDashboardSummaryForUser;
+  routePlanningRepository.getDashboardSummaryForUser =
+    originalRepository.getRouteDashboardSummaryForUser;
 }
 
 test.afterEach(() => {
@@ -150,13 +151,13 @@ test("home autenticada carrega e api do portal retorna usuario autenticado", asy
     tipoUsuario: "administrador",
     ativo: true,
   });
-  deliveryRepository.getDashboardSummary = async () => ({
+  deliveryRepository.getDashboardSummaryForUser = async () => ({
     total: 3,
     emTransito: 1,
     entregues: 1,
     pendentes: 1,
   });
-  routePlanningRepository.getDashboardSummary = async () => ({
+  routePlanningRepository.getDashboardSummaryForUser = async () => ({
     total: 2,
     planejadas: 1,
     emAndamento: 1,

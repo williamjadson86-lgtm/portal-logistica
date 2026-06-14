@@ -20,13 +20,13 @@ const uploadDir = path.join(
 
 const originalRepositories = {
   findById: userRepository.findById,
-  listByUserId: deliveryRepository.listByUserId,
-  findByDeliveryId: deliveryRepository.findById,
+  listForUser: deliveryRepository.listForUser,
+  findByDeliveryIdForUser: deliveryRepository.findByIdForUser,
   create: deliveryRepository.create,
   updateById: deliveryRepository.updateById,
   updateStatusById: deliveryRepository.updateStatusById,
   deleteById: deliveryRepository.deleteById,
-  createProof: proofRepository.create,
+  createProofForUser: proofRepository.createForUser,
   cancelPendingByDeliveryId: financeRepository.cancelPendingByDeliveryId,
   createFinancialEntry: financeRepository.createFromDelivery,
   appendEvent: deliveryEventRepository.appendEvent,
@@ -34,13 +34,13 @@ const originalRepositories = {
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
-  deliveryRepository.listByUserId = originalRepositories.listByUserId;
-  deliveryRepository.findById = originalRepositories.findByDeliveryId;
+  deliveryRepository.listForUser = originalRepositories.listForUser;
+  deliveryRepository.findByIdForUser = originalRepositories.findByDeliveryIdForUser;
   deliveryRepository.create = originalRepositories.create;
   deliveryRepository.updateById = originalRepositories.updateById;
   deliveryRepository.updateStatusById = originalRepositories.updateStatusById;
   deliveryRepository.deleteById = originalRepositories.deleteById;
-  proofRepository.create = originalRepositories.createProof;
+  proofRepository.createForUser = originalRepositories.createProofForUser;
   financeRepository.cancelPendingByDeliveryId = originalRepositories.cancelPendingByDeliveryId;
   financeRepository.createFromDelivery = originalRepositories.createFinancialEntry;
   deliveryEventRepository.appendEvent = originalRepositories.appendEvent;
@@ -104,7 +104,7 @@ test.afterEach(() => {
 
 test("lista entregas com resumo autenticado", async () => {
   mockAuthenticatedUser();
-  deliveryRepository.listByUserId = async () => [
+  deliveryRepository.listForUser = async () => [
     {
       id: "ab60f6d4-4a09-4b33-9afd-8f57cb44e3f7",
       codigo: "ENT-100",
@@ -233,7 +233,7 @@ test("rejeita criacao com dados invalidos", async () => {
 
 test("busca entrega por id valido", async () => {
   mockAuthenticatedUser();
-  deliveryRepository.findById = async () => ({
+  deliveryRepository.findByIdForUser = async () => ({
     id: "ab60f6d4-4a09-4b33-9afd-8f57cb44e3f7",
     codigo: "ENT-501",
     cliente: "Cliente XPTO",
@@ -256,7 +256,7 @@ test("busca entrega por id valido", async () => {
 
 test("detalhe da entrega retorna rota, motorista e veiculo quando houver", async () => {
   mockAuthenticatedUser();
-  deliveryRepository.findById = async () => ({
+  deliveryRepository.findByIdForUser = async () => ({
     id: "ab60f6d4-4a09-4b33-9afd-8f57cb44e3f7",
     codigo: "ENT-502",
     cliente: "Cliente XPTO",
@@ -409,7 +409,7 @@ test("exclui entrega existente", async () => {
 
 test("upload rapido de comprovante pela entrega reutiliza a api existente", async () => {
   mockAuthenticatedUser();
-  proofRepository.create = async (_userId, entregaId, payload) => ({
+  proofRepository.createForUser = async (_user, entregaId, payload) => ({
     id: "d50b8d55-8db9-4f64-8f5a-f09f2d8ab5ea",
     entregaId,
     usuarioId: "4df4eeb4-a4df-4ab7-b5f7-5a1f397f0d22",

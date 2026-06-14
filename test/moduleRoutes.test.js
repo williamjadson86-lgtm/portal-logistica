@@ -20,15 +20,15 @@ const app = require("../src/app");
 
 const originalRepositories = {
   findById: userRepository.findById,
-  getDashboardSummary: deliveryRepository.getDashboardSummary,
-  getRouteDashboardSummary: routePlanningRepository.getDashboardSummary,
-  getRouteSupportData: routePlanningRepository.getSupportData,
+  getDashboardSummaryForUser: deliveryRepository.getDashboardSummaryForUser,
+  getRouteDashboardSummaryForUser: routePlanningRepository.getDashboardSummaryForUser,
+  getRouteSupportDataForUser: routePlanningRepository.getSupportDataForUser,
   listActive: noticeRepository.listActive,
   findSettings: settingsRepository.findByUserId,
   findProfile: profileRepository.findByUserId,
-  listRoutes: routePlanningRepository.listByUserId,
-  listProofs: proofRepository.listByUserId,
-  listProofDeliveries: proofRepository.listDeliveriesForProofs,
+  listRoutesForUser: routePlanningRepository.listForUser,
+  listProofsForUser: proofRepository.listForUser,
+  listProofDeliveriesForUser: proofRepository.listDeliveriesForUser,
   listFinance: financeRepository.listByUserId,
   financeSupportData: financeRepository.listSupportData,
   listDocuments: documentRepository.listByUserId,
@@ -56,16 +56,18 @@ const modulePages = [
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
-  deliveryRepository.getDashboardSummary = originalRepositories.getDashboardSummary;
-  routePlanningRepository.getDashboardSummary =
-    originalRepositories.getRouteDashboardSummary;
-  routePlanningRepository.getSupportData = originalRepositories.getRouteSupportData;
+  deliveryRepository.getDashboardSummaryForUser =
+    originalRepositories.getDashboardSummaryForUser;
+  routePlanningRepository.getDashboardSummaryForUser =
+    originalRepositories.getRouteDashboardSummaryForUser;
+  routePlanningRepository.getSupportDataForUser =
+    originalRepositories.getRouteSupportDataForUser;
   noticeRepository.listActive = originalRepositories.listActive;
   settingsRepository.findByUserId = originalRepositories.findSettings;
   profileRepository.findByUserId = originalRepositories.findProfile;
-  routePlanningRepository.listByUserId = originalRepositories.listRoutes;
-  proofRepository.listByUserId = originalRepositories.listProofs;
-  proofRepository.listDeliveriesForProofs = originalRepositories.listProofDeliveries;
+  routePlanningRepository.listForUser = originalRepositories.listRoutesForUser;
+  proofRepository.listForUser = originalRepositories.listProofsForUser;
+  proofRepository.listDeliveriesForUser = originalRepositories.listProofDeliveriesForUser;
   financeRepository.listByUserId = originalRepositories.listFinance;
   financeRepository.listSupportData = originalRepositories.financeSupportData;
   documentRepository.listByUserId = originalRepositories.listDocuments;
@@ -75,13 +77,13 @@ function restoreRepositories() {
   vehicleRepository.listByUserId = originalRepositories.listVehicles;
 }
 
-function createCookie() {
+function createCookie(tipoUsuario = "administrador") {
   const token = jwt.sign(
     {
       sub: "1b36b068-cc2c-4388-a5de-2528ba53a1c9",
       nome: "Jadson William",
       matricula: "COL1234",
-      tipoUsuario: "colaborador",
+      tipoUsuario,
     },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn },
@@ -99,16 +101,16 @@ test("home api retorna dashboard de entregas autenticado", async () => {
     id: "1b36b068-cc2c-4388-a5de-2528ba53a1c9",
     nome: "Jadson William",
     matricula: "COL1234",
-    tipoUsuario: "colaborador",
+    tipoUsuario: "operador",
     ativo: true,
   });
-  deliveryRepository.getDashboardSummary = async () => ({
+  deliveryRepository.getDashboardSummaryForUser = async () => ({
     total: 7,
     emTransito: 2,
     entregues: 4,
     pendentes: 1,
   });
-  routePlanningRepository.getDashboardSummary = async () => ({
+  routePlanningRepository.getDashboardSummaryForUser = async () => ({
     total: 5,
     planejadas: 2,
     emAndamento: 2,
@@ -117,13 +119,13 @@ test("home api retorna dashboard de entregas autenticado", async () => {
 
   const response = await request(app)
     .get("/api/portal/home")
-    .set("Cookie", createCookie());
+    .set("Cookie", createCookie("operador"));
 
   assert.equal(response.status, 200);
   assert.equal(response.body.dashboard.totalEntregas, 7);
   assert.equal(response.body.dashboard.entregasEntregues, 4);
   assert.equal(response.body.rotas.rotasPlanejadas, 2);
-  assert.equal(response.body.cards.length, 13);
+  assert.equal(response.body.cards.length, 9);
 });
 
 test("modulos html exigem autenticacao", async () => {
@@ -140,7 +142,7 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
     id: "1b36b068-cc2c-4388-a5de-2528ba53a1c9",
     nome: "Jadson William",
     matricula: "COL1234",
-    tipoUsuario: "colaborador",
+    tipoUsuario: "administrador",
     ativo: true,
   });
   profileRepository.findByUserId = async () => ({
@@ -161,7 +163,7 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
       lancamentos: 4,
     },
   });
-  routePlanningRepository.listByUserId = async () => [
+  routePlanningRepository.listForUser = async () => [
     {
       id: "1f8ad72f-b4a2-4125-9ee7-d0412b55a792",
       codigo: "ROT-001",
@@ -178,7 +180,7 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
       totalEntregasHistorico: 1,
     },
   ];
-  routePlanningRepository.getSupportData = async () => ({
+  routePlanningRepository.getSupportDataForUser = async () => ({
     motoristas: [{ id: "9f96ec45-2773-4afb-b596-053f9a9926d3", nome: "Marcio Lima" }],
     veiculos: [
       {
@@ -189,7 +191,7 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
     ],
     entregasDisponiveis: [],
   });
-  proofRepository.listByUserId = async () => [
+  proofRepository.listForUser = async () => [
     {
       id: "68b92e32-68d0-4ef7-9bd2-6bd79857f0f6",
       entregaId: "c79086e6-94ce-4376-b0c2-6de9454cb64d",
@@ -205,7 +207,7 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
       criadoEm: new Date().toISOString(),
     },
   ];
-  proofRepository.listDeliveriesForProofs = async () => [
+  proofRepository.listDeliveriesForUser = async () => [
     {
       id: "c79086e6-94ce-4376-b0c2-6de9454cb64d",
       codigo: "ENT-001",
@@ -336,17 +338,17 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
   ];
 
   const apiResponses = await Promise.all([
-    request(app).get("/api/perfil").set("Cookie", createCookie()),
-    request(app).get("/api/rotas").set("Cookie", createCookie()),
-    request(app).get("/api/comprovantes").set("Cookie", createCookie()),
-    request(app).get("/api/financeiro").set("Cookie", createCookie()),
-    request(app).get("/api/documentos").set("Cookie", createCookie()),
-    request(app).get("/api/suporte").set("Cookie", createCookie()),
-    request(app).get("/api/clientes").set("Cookie", createCookie()),
-    request(app).get("/api/avisos").set("Cookie", createCookie()),
-    request(app).get("/api/configuracoes").set("Cookie", createCookie()),
-    request(app).get("/api/motoristas").set("Cookie", createCookie()),
-    request(app).get("/api/veiculos").set("Cookie", createCookie()),
+    request(app).get("/api/perfil").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/rotas").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/comprovantes").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/financeiro").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/documentos").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/suporte").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/clientes").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/avisos").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/configuracoes").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/motoristas").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/veiculos").set("Cookie", createCookie("administrador")),
   ]);
 
   assert.equal(apiResponses[0].body.resumo[0].valor, "colaborador");

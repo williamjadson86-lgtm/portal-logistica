@@ -3,6 +3,7 @@ const env = require("../config/env");
 const deliveryRepository = require("../repositories/deliveryRepository");
 const routePlanningRepository = require("../repositories/routePlanningRepository");
 const resolveView = require("../utils/viewResolver");
+const { PERMISSIONS, hasPermission, filterCardsForUser } = require("../config/permissions");
 
 const cards = [
   {
@@ -112,10 +113,30 @@ function homePage(_req, res) {
   res.sendFile(resolveView("home.html"));
 }
 
+function accessDeniedPage(_req, res) {
+  res.status(403).sendFile(resolveView("acesso-negado.html"));
+}
+
 async function homeData(req, res) {
+  const canViewDeliveries = hasPermission(req.user, PERMISSIONS.DELIVERIES_VIEW);
+  const canViewRoutes = hasPermission(req.user, PERMISSIONS.ROUTES_VIEW);
   const [dashboard, routeDashboard] = await Promise.all([
-    deliveryRepository.getDashboardSummary(req.user.id),
-    routePlanningRepository.getDashboardSummary(req.user.id),
+    canViewDeliveries
+      ? deliveryRepository.getDashboardSummaryForUser(req.user)
+      : {
+          total: 0,
+          emTransito: 0,
+          entregues: 0,
+          pendentes: 0,
+        },
+    canViewRoutes
+      ? routePlanningRepository.getDashboardSummaryForUser(req.user)
+      : {
+          total: 0,
+          planejadas: 0,
+          emAndamento: 0,
+          concluidas: 0,
+        },
   ]);
 
   res.json({
@@ -131,7 +152,7 @@ async function homeData(req, res) {
       rotasEmAndamento: routeDashboard.emAndamento,
       rotasConcluidas: routeDashboard.concluidas,
     },
-    cards,
+    cards: filterCardsForUser(cards, req.user),
   });
 }
 
@@ -140,5 +161,6 @@ module.exports = {
   loginPage,
   registerPage,
   homePage,
+  accessDeniedPage,
   homeData,
 };

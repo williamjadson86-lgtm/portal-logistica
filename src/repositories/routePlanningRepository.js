@@ -1,5 +1,7 @@
 const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
+const { USER_ROLES } = require("../config/permissions");
+const { findLinkedDriverId } = require("./driverAccessRepository");
 
 const ELIGIBLE_DELIVERY_STATUSES = ["pendente", "coletada", "em_transito"];
 
@@ -109,6 +111,36 @@ async function getDashboardSummary(userId) {
   return result.rows[0];
 }
 
+async function getDashboardSummaryForUser(user) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return getDashboardSummary(user.id);
+  }
+
+  const driverId = await findLinkedDriverId(user);
+  if (!driverId) {
+    return {
+      total: 0,
+      planejadas: 0,
+      emAndamento: 0,
+      concluidas: 0,
+    };
+  }
+
+  const result = await database.query(
+    `SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE status = 'planejada')::int AS planejadas,
+      COUNT(*) FILTER (WHERE status = 'em_andamento')::int AS "emAndamento",
+      COUNT(*) FILTER (WHERE status = 'concluida')::int AS concluidas
+    FROM rotas_operacionais
+    WHERE usuario_id = $1
+      AND motorista_id = $2`,
+    [user.id, driverId],
+  );
+
+  return result.rows[0];
+}
+
 async function listByUserId(userId) {
   const result = await database.query(
     `SELECT
@@ -135,6 +167,47 @@ async function listByUserId(userId) {
     GROUP BY r.id, m.nome, v.placa
     ORDER BY r.data_rota DESC, r.criado_em DESC`,
     [userId],
+  );
+
+  return result.rows.map(mapRoute);
+}
+
+async function listForUser(user) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return listByUserId(user.id);
+  }
+
+  const driverId = await findLinkedDriverId(user);
+  if (!driverId) {
+    return [];
+  }
+
+  const result = await database.query(
+    `SELECT
+      r.id,
+      r.codigo,
+      r.motorista_id AS "motoristaId",
+      m.nome AS "motoristaNome",
+      r.veiculo_id AS "veiculoId",
+      v.placa AS "veiculoPlaca",
+      r.origem,
+      r.destino,
+      TO_CHAR(r.data_rota, 'YYYY-MM-DD') AS "dataRota",
+      r.status,
+      r.observacoes,
+      COUNT(re.id) FILTER (WHERE re.ativo = TRUE)::int AS "totalEntregasAtivas",
+      COUNT(re.id)::int AS "totalEntregasHistorico",
+      r.criado_em AS "criadoEm",
+      r.atualizado_em AS "atualizadoEm"
+    FROM rotas_operacionais r
+    LEFT JOIN motoristas m ON m.id = r.motorista_id
+    LEFT JOIN veiculos v ON v.id = r.veiculo_id
+    LEFT JOIN rota_entregas re ON re.rota_id = r.id
+    WHERE r.usuario_id = $1
+      AND r.motorista_id = $2
+    GROUP BY r.id, m.nome, v.placa
+    ORDER BY r.data_rota DESC, r.criado_em DESC`,
+    [user.id, driverId],
   );
 
   return result.rows.map(mapRoute);
@@ -198,6 +271,91 @@ async function findById(userId, routeId, client = database) {
   return {
     ...route,
     entregas: deliveriesResult.rows.map(mapLinkedDelivery),
+  };
+}
+
+async function findByIdForUser(user, routeId, client = database) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return findById(user.id, routeId, client);
+  }
+
+  const driverId = await findLinkedDriverId(user);
+  if (!driverId) {
+    return null;
+  }
+
+  const routeResult = await client.query(
+    `SELECT
+      r.id,
+      r.codigo,
+      r.motorista_id AS "motoristaId",
+      m.nome AS "motoristaNome",
+      r.veiculo_id AS "veiculoId",
+      v.placa AS "veiculoPlaca",
+      r.origem,
+      r.destino,
+      TO_CHAR(r.data_rota, 'YYYY-MM-DD') AS "dataRota",
+      r.status,
+      r.observacoes,
+      COUNT(re.id) FILTER (WHERE re.ativo = TRUE)::int AS "totalEntregasAtivas",
+      COUNT(re.id)::int AS "totalEntregasHistorico",
+      r.criado_em AS "criadoEm",
+      r.atualizado_em AS "atualizadoEm"
+    FROM rotas_operacionais r
+    LEFT JOIN motoristas m ON m.id = r.motorista_id
+    LEFT JOIN veiculos v ON v.id = r.veiculo_id
+    LEFT JOIN rota_entregas re ON re.rota_id = r.id
+    WHERE r.usuario_id = $1
+      AND r.id = $2
+      AND r.motorista_id = $3
+    GROUP BY r.id, m.nome, v.placa`,
+    [user.id, routeId, driverId],
+  );
+
+  const route = mapRoute(routeResult.rows[0]);
+  if (!route) {
+    return null;
+  }
+
+  const deliveriesResult = await client.query(
+    `SELECT
+      re.id AS "relacaoId",
+      re.ativo,
+      re.vinculado_em AS "vinculadoEm",
+      re.desvinculado_em AS "desvinculadoEm",
+      d.id,
+      d.codigo,
+      d.cliente,
+      d.origem,
+      d.destino,
+      d.cidade,
+      d.estado,
+      d.status,
+      TO_CHAR(d.previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
+      COALESCE(d.observacoes, d.descricao, '') AS observacoes
+    FROM rota_entregas re
+    INNER JOIN entregas d ON d.id = re.entrega_id
+    WHERE re.usuario_id = $1
+      AND re.rota_id = $2
+    ORDER BY re.ativo DESC, re.vinculado_em DESC`,
+    [user.id, routeId],
+  );
+
+  return {
+    ...route,
+    entregas: deliveriesResult.rows.map(mapLinkedDelivery),
+  };
+}
+
+async function getSupportDataForUser(user, client = database) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return getSupportData(user.id, client);
+  }
+
+  return {
+    motoristas: [],
+    veiculos: [],
+    entregasDisponiveis: [],
   };
 }
 
@@ -695,9 +853,13 @@ async function cancelRoute(userId, routeId) {
 
 module.exports = {
   getDashboardSummary,
+  getDashboardSummaryForUser,
   getSupportData,
+  getSupportDataForUser,
   listByUserId,
+  listForUser,
   findById,
+  findByIdForUser,
   create,
   updateById,
   deleteById,

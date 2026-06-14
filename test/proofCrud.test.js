@@ -19,10 +19,10 @@ const uploadDir = path.join(
 
 const originalRepositories = {
   findById: userRepository.findById,
-  listByUserId: proofRepository.listByUserId,
-  listDeliveriesForProofs: proofRepository.listDeliveriesForProofs,
-  findProofById: proofRepository.findById,
-  create: proofRepository.create,
+  listForUser: proofRepository.listForUser,
+  listDeliveriesForUser: proofRepository.listDeliveriesForUser,
+  findProofByIdForUser: proofRepository.findByIdForUser,
+  createForUser: proofRepository.createForUser,
   updateById: proofRepository.updateById,
   deactivateById: proofRepository.deactivateById,
   appendEvent: deliveryEventRepository.appendEvent,
@@ -30,10 +30,10 @@ const originalRepositories = {
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
-  proofRepository.listByUserId = originalRepositories.listByUserId;
-  proofRepository.listDeliveriesForProofs = originalRepositories.listDeliveriesForProofs;
-  proofRepository.findById = originalRepositories.findProofById;
-  proofRepository.create = originalRepositories.create;
+  proofRepository.listForUser = originalRepositories.listForUser;
+  proofRepository.listDeliveriesForUser = originalRepositories.listDeliveriesForUser;
+  proofRepository.findByIdForUser = originalRepositories.findProofByIdForUser;
+  proofRepository.createForUser = originalRepositories.createForUser;
   proofRepository.updateById = originalRepositories.updateById;
   proofRepository.deactivateById = originalRepositories.deactivateById;
   deliveryEventRepository.appendEvent = originalRepositories.appendEvent;
@@ -103,7 +103,7 @@ test.afterEach(() => {
 test("upload de comprovante autenticado", async () => {
   mockAuthenticatedUser();
   let capturedEvent = null;
-  proofRepository.create = async (_userId, _entregaId, payload) =>
+  proofRepository.createForUser = async (_user, _entregaId, payload) =>
     proofFixture({
       tipo: payload.tipo,
       arquivoNome: payload.arquivoNome,
@@ -165,7 +165,7 @@ test("bloqueia arquivo grande", async () => {
 
 test("lista comprovantes por entrega", async () => {
   mockAuthenticatedUser();
-  proofRepository.listByUserId = async (_userId, filters) => [
+  proofRepository.listForUser = async (_user, filters) => [
     proofFixture({ entregaId: filters.entregaId }),
   ];
 
@@ -179,7 +179,7 @@ test("lista comprovantes por entrega", async () => {
 
 test("inativa comprovante", async () => {
   mockAuthenticatedUser();
-  proofRepository.findById = async () => proofFixture();
+  proofRepository.findByIdForUser = async () => proofFixture();
   proofRepository.deactivateById = async () => ({ id: "c0cd7356-436a-4e18-9ea5-583f1e019326" });
 
   const response = await request(app)

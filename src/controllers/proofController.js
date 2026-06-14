@@ -28,8 +28,8 @@ async function list(req, res) {
   }
 
   const [comprovantes, entregas] = await Promise.all([
-    repository.listByUserId(req.user.id, { entregaId, ativo: true }),
-    repository.listDeliveriesForProofs(req.user.id),
+    repository.listForUser(req.user, { entregaId, ativo: true }),
+    repository.listDeliveriesForUser(req.user),
   ]);
 
   res.json({
@@ -46,7 +46,7 @@ async function list(req, res) {
 
 async function show(req, res) {
   ensureValidUuid(req.params.id, "comprovante");
-  const comprovante = await repository.findById(req.user.id, req.params.id);
+  const comprovante = await repository.findByIdForUser(req.user, req.params.id);
 
   if (!comprovante) {
     throw new HttpError(404, "Comprovante nao encontrado");
@@ -57,7 +57,7 @@ async function show(req, res) {
 
 async function listByDelivery(req, res) {
   ensureValidUuid(req.params.entregaId, "entrega");
-  const comprovantes = await repository.listByUserId(req.user.id, {
+  const comprovantes = await repository.listForUser(req.user, {
     entregaId: req.params.entregaId,
   });
 
@@ -73,7 +73,7 @@ async function create(req, res) {
       throw new HttpError(400, "Dados invalidos", errors);
     }
 
-    const comprovante = await repository.create(req.user.id, req.params.entregaId, {
+    const comprovante = await repository.createForUser(req.user, req.params.entregaId, {
       ...data,
       arquivoNome: req.file ? req.file.originalname : null,
       arquivoCaminho: req.file ? req.file.path : null,
@@ -128,7 +128,7 @@ async function update(req, res) {
 
 async function remove(req, res) {
   ensureValidUuid(req.params.id, "comprovante");
-  const proof = await repository.findById(req.user.id, req.params.id);
+  const proof = await repository.findByIdForUser(req.user, req.params.id);
   if (!proof) {
     throw new HttpError(404, "Comprovante nao encontrado");
   }
@@ -156,7 +156,7 @@ async function remove(req, res) {
 
 async function streamFile(req, res) {
   ensureValidUuid(req.params.id, "comprovante");
-  const comprovante = await repository.findById(req.user.id, req.params.id);
+  const comprovante = await repository.findByIdForUser(req.user, req.params.id);
 
   if (!comprovante || !comprovante.ativo || !comprovante.arquivoCaminho) {
     throw new HttpError(404, "Arquivo de comprovante nao encontrado");

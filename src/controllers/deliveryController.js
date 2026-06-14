@@ -39,7 +39,7 @@ function ensureFound(delivery) {
 }
 
 async function list(req, res) {
-  const deliveries = await repository.listByUserId(req.user.id);
+  const deliveries = await repository.listForUser(req.user);
 
   res.json({
     resumo: buildSummary(deliveries),
@@ -49,7 +49,7 @@ async function list(req, res) {
 
 async function show(req, res) {
   ensureValidUuid(req.params.id);
-  const delivery = await repository.findById(req.user.id, req.params.id);
+  const delivery = await repository.findByIdForUser(req.user, req.params.id);
   ensureFound(delivery);
 
   res.json({ entrega: delivery });

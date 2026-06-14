@@ -1,5 +1,7 @@
 const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
+const { USER_ROLES } = require("../config/permissions");
+const { findLinkedDriverId } = require("./driverAccessRepository");
 
 function mapLinkedClient(row) {
   if (!row?.clienteId) {
@@ -144,6 +146,38 @@ async function getDashboardSummary(userId) {
   return result.rows[0];
 }
 
+async function getDashboardSummaryForUser(user) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return getDashboardSummary(user.id);
+  }
+
+  const driverId = await findLinkedDriverId(user);
+  if (!driverId) {
+    return {
+      total: 0,
+      emTransito: 0,
+      entregues: 0,
+      pendentes: 0,
+    };
+  }
+
+  const result = await database.query(
+    `SELECT
+      COUNT(DISTINCT d.id)::int AS total,
+      COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'em_transito')::int AS "emTransito",
+      COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'entregue')::int AS entregues,
+      COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'pendente')::int AS pendentes
+    FROM entregas d
+    INNER JOIN rota_entregas re ON re.entrega_id = d.id
+    INNER JOIN rotas_operacionais r ON r.id = re.rota_id
+    WHERE d.usuario_id = $1
+      AND r.motorista_id = $2`,
+    [user.id, driverId],
+  );
+
+  return result.rows[0];
+}
+
 async function listByUserId(userId) {
   const result = await database.query(
     `${buildDeliverySelect()}
@@ -153,6 +187,36 @@ async function listByUserId(userId) {
     WHERE d.usuario_id = $1
     ORDER BY d.previsao_entrega ASC NULLS LAST, d.criado_em DESC`,
     [userId],
+  );
+
+  return result.rows.map(mapDelivery);
+}
+
+async function listForUser(user) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return listByUserId(user.id);
+  }
+
+  const driverId = await findLinkedDriverId(user);
+  if (!driverId) {
+    return [];
+  }
+
+  const result = await database.query(
+    `${buildDeliverySelect()}
+    FROM entregas d
+    LEFT JOIN clientes c
+      ON c.id = d.cliente_id
+    WHERE d.usuario_id = $1
+      AND EXISTS (
+        SELECT 1
+        FROM rota_entregas re
+        INNER JOIN rotas_operacionais r ON r.id = re.rota_id
+        WHERE re.entrega_id = d.id
+          AND r.motorista_id = $2
+      )
+    ORDER BY d.previsao_entrega ASC NULLS LAST, d.criado_em DESC`,
+    [user.id, driverId],
   );
 
   return result.rows.map(mapDelivery);
@@ -202,6 +266,67 @@ async function findById(userId, deliveryId) {
       ON v.id = r.veiculo_id
     WHERE d.usuario_id = $1 AND d.id = $2`,
     [userId, deliveryId],
+  );
+
+  return mapDelivery(result.rows[0]);
+}
+
+async function findByIdForUser(user, deliveryId) {
+  if (user?.tipoUsuario !== USER_ROLES.MOTORISTA) {
+    return findById(user.id, deliveryId);
+  }
+
+  const driverId = await findLinkedDriverId(user);
+  if (!driverId) {
+    return null;
+  }
+
+  const result = await database.query(
+    `SELECT
+      d.id,
+      d.codigo,
+      d.cliente_id AS "clienteId",
+      d.cliente,
+      c.nome AS "clienteNome",
+      c.documento AS "clienteDocumento",
+      c.status AS "clienteStatus",
+      d.origem,
+      d.destino,
+      d.cidade,
+      d.estado,
+      d.status,
+      TO_CHAR(d.previsao_entrega, 'YYYY-MM-DD') AS "dataPrevista",
+      d.valor_frete AS "valorFrete",
+      COALESCE(d.observacoes, d.descricao, '') AS observacoes,
+      r.id AS "rotaId",
+      r.codigo AS "rotaCodigo",
+      r.status AS "rotaStatus",
+      TO_CHAR(r.data_rota, 'YYYY-MM-DD') AS "rotaData",
+      m.id AS "motoristaId",
+      m.nome AS "motoristaNome",
+      v.id AS "veiculoId",
+      v.placa AS "veiculoPlaca",
+      v.modelo AS "veiculoModelo",
+      d.criado_em AS "criadoEm",
+      d.atualizado_em AS "atualizadoEm"
+    FROM entregas d
+    LEFT JOIN clientes c
+      ON c.id = d.cliente_id
+    LEFT JOIN rota_entregas re
+      ON re.entrega_id = d.id
+    LEFT JOIN rotas_operacionais r
+      ON r.id = re.rota_id
+      AND r.usuario_id = d.usuario_id
+    LEFT JOIN motoristas m
+      ON m.id = r.motorista_id
+    LEFT JOIN veiculos v
+      ON v.id = r.veiculo_id
+    WHERE d.usuario_id = $1
+      AND d.id = $2
+      AND r.motorista_id = $3
+    ORDER BY re.ativo DESC
+    LIMIT 1`,
+    [user.id, deliveryId, driverId],
   );
 
   return mapDelivery(result.rows[0]);
@@ -345,8 +470,11 @@ async function deleteById(userId, deliveryId) {
 
 module.exports = {
   getDashboardSummary,
+  getDashboardSummaryForUser,
   listByUserId,
+  listForUser,
   findById,
+  findByIdForUser,
   create,
   updateById,
   updateStatusById,

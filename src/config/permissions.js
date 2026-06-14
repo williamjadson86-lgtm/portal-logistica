@@ -1,0 +1,121 @@
+const USER_ROLES = {
+  ADMINISTRADOR: "administrador",
+  OPERADOR: "operador",
+  MOTORISTA: "motorista",
+  FINANCEIRO: "financeiro",
+  COLABORADOR: "colaborador",
+};
+
+const PERMISSIONS = {
+  PROFILE_VIEW: "profile:view",
+  HOME_VIEW: "home:view",
+  NOTICES_VIEW: "notices:view",
+  DELIVERIES_VIEW: "deliveries:view",
+  DELIVERIES_MANAGE: "deliveries:manage",
+  DELIVERY_EVENTS_VIEW: "delivery-events:view",
+  ROUTES_VIEW: "routes:view",
+  ROUTES_MANAGE: "routes:manage",
+  CLIENTS_VIEW: "clients:view",
+  CLIENTS_MANAGE: "clients:manage",
+  DRIVERS_VIEW: "drivers:view",
+  DRIVERS_MANAGE: "drivers:manage",
+  VEHICLES_VIEW: "vehicles:view",
+  VEHICLES_MANAGE: "vehicles:manage",
+  PROOFS_VIEW: "proofs:view",
+  PROOFS_UPLOAD: "proofs:upload",
+  PROOFS_MANAGE: "proofs:manage",
+  FINANCE_VIEW: "finance:view",
+  FINANCE_MANAGE: "finance:manage",
+  REPORTS_VIEW: "reports:view",
+  DASHBOARD_VIEW: "dashboard:view",
+  DOCUMENTS_VIEW: "documents:view",
+  SUPPORT_VIEW: "support:view",
+  SETTINGS_VIEW: "settings:view",
+};
+
+const ROLE_PERMISSIONS = {
+  [USER_ROLES.ADMINISTRADOR]: ["*"],
+  [USER_ROLES.OPERADOR]: [
+    PERMISSIONS.HOME_VIEW,
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.NOTICES_VIEW,
+    PERMISSIONS.DELIVERIES_VIEW,
+    PERMISSIONS.DELIVERIES_MANAGE,
+    PERMISSIONS.DELIVERY_EVENTS_VIEW,
+    PERMISSIONS.ROUTES_VIEW,
+    PERMISSIONS.ROUTES_MANAGE,
+    PERMISSIONS.CLIENTS_VIEW,
+    PERMISSIONS.CLIENTS_MANAGE,
+    PERMISSIONS.DRIVERS_VIEW,
+    PERMISSIONS.DRIVERS_MANAGE,
+    PERMISSIONS.VEHICLES_VIEW,
+    PERMISSIONS.VEHICLES_MANAGE,
+    PERMISSIONS.PROOFS_VIEW,
+    PERMISSIONS.PROOFS_UPLOAD,
+    PERMISSIONS.PROOFS_MANAGE,
+    PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.DASHBOARD_VIEW,
+  ],
+  [USER_ROLES.MOTORISTA]: [
+    PERMISSIONS.HOME_VIEW,
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.NOTICES_VIEW,
+    PERMISSIONS.DELIVERIES_VIEW,
+    PERMISSIONS.DELIVERY_EVENTS_VIEW,
+    PERMISSIONS.ROUTES_VIEW,
+    PERMISSIONS.PROOFS_VIEW,
+    PERMISSIONS.PROOFS_UPLOAD,
+  ],
+  [USER_ROLES.FINANCEIRO]: [
+    PERMISSIONS.HOME_VIEW,
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.NOTICES_VIEW,
+    PERMISSIONS.CLIENTS_VIEW,
+    PERMISSIONS.CLIENTS_MANAGE,
+    PERMISSIONS.FINANCE_VIEW,
+    PERMISSIONS.FINANCE_MANAGE,
+    PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.DASHBOARD_VIEW,
+  ],
+  [USER_ROLES.COLABORADOR]: [
+    PERMISSIONS.HOME_VIEW,
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.NOTICES_VIEW,
+  ],
+};
+
+const CARD_PERMISSIONS = {
+  "/perfil": PERMISSIONS.PROFILE_VIEW,
+  "/entregas": PERMISSIONS.DELIVERIES_VIEW,
+  "/rotas": PERMISSIONS.ROUTES_VIEW,
+  "/clientes": PERMISSIONS.CLIENTS_VIEW,
+  "/motoristas": PERMISSIONS.DRIVERS_VIEW,
+  "/veiculos": PERMISSIONS.VEHICLES_VIEW,
+  "/comprovantes": PERMISSIONS.PROOFS_VIEW,
+  "/financeiro": PERMISSIONS.FINANCE_VIEW,
+  "/relatorios": PERMISSIONS.REPORTS_VIEW,
+  "/documentos": PERMISSIONS.DOCUMENTS_VIEW,
+  "/suporte": PERMISSIONS.SUPPORT_VIEW,
+  "/avisos": PERMISSIONS.NOTICES_VIEW,
+  "/configuracoes": PERMISSIONS.SETTINGS_VIEW,
+};
+
+function hasPermission(user, permission) {
+  if (!permission) {
+    return true;
+  }
+
+  const permissions = ROLE_PERMISSIONS[user?.tipoUsuario] || [];
+  return permissions.includes("*") || permissions.includes(permission);
+}
+
+function filterCardsForUser(cards, user) {
+  return cards.filter((card) => hasPermission(user, CARD_PERMISSIONS[card.href]));
+}
+
+module.exports = {
+  USER_ROLES,
+  PERMISSIONS,
+  hasPermission,
+  filterCardsForUser,
+};
