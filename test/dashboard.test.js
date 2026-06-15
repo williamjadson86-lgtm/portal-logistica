@@ -59,7 +59,13 @@ function createDashboardPayload(filter = { periodo: "7d", dataInicio: "2026-06-0
       veiculosDisponiveis: 4,
       veiculosEmRota: 2,
       veiculosEmManutencao: 1,
+      manutencoesProgramadas: 4,
       receitaTotalPeriodo: 8900.5,
+      totalDespesasFrotaPeriodo: 2400.25,
+      custoManutencaoPeriodo: 700.35,
+      lucroOperacionalPeriodo: 6500.25,
+      resultadoLiquidoPeriodo: 6500.25,
+      margemOperacionalPeriodo: 73.03,
       valoresPendentes: 2100.75,
       valoresPagos: 6400.25,
       lancamentosVencidos: 2,
@@ -73,6 +79,8 @@ function createDashboardPayload(filter = { periodo: "7d", dataInicio: "2026-06-0
       entregasSemRota: 3,
       rotasEmAndamento: 2,
       lancamentosVencidos: 2,
+      despesasFrotaVencidas: 1,
+      manutencoesVencidas: 1,
     },
     produtividade: {
       entregasConcluidasPeriodo: 6,
@@ -82,10 +90,32 @@ function createDashboardPayload(filter = { periodo: "7d", dataInicio: "2026-06-0
       entregasSemRota: 3,
       totalComprovantesPeriodo: 5,
       entregasEntreguesSemComprovante: 2,
+      manutencoesConcluidasPeriodo: 2,
       receitaTotalPeriodo: 8900.5,
+      totalDespesasFrotaPeriodo: 2400.25,
+      custoManutencaoPeriodo: 700.35,
+      lucroOperacionalPeriodo: 6500.25,
+      resultadoLiquidoPeriodo: 6500.25,
+      margemOperacionalPeriodo: 73.03,
       valoresPendentes: 2100.75,
       valoresPagos: 6400.25,
       lancamentosVencidos: 2,
+      despesasFrotaVencidas: 1,
+    },
+    frota: {
+      custoTotalFrotaPeriodo: 2400.25,
+      custoManutencaoPeriodo: 700.35,
+      custoMedioPorVeiculo: 800.08,
+      custoMedioPorMotorista: 1200.13,
+      veiculosMaiorDespesa: [
+        { veiculoId: "v1", placa: "ABC1D23", modelo: "Sprinter", custoTotal: 1200.1 },
+      ],
+      motoristasMaiorDespesa: [
+        { motoristaId: "m1", nome: "Paulo Nunes", custoTotal: 1200.1 },
+      ],
+      manutencoesVencidas: 1,
+      lucroLiquidoPeriodo: 6500.25,
+      margemOperacionalPeriodo: 73.03,
     },
   };
 }
@@ -113,10 +143,14 @@ test("dashboard retorna metricas e alertas autenticado", async () => {
   assert.equal(response.body.metricas.totalEntregas, 12);
   assert.equal(response.body.alertas.entregasSemRota, 3);
   assert.equal(response.body.alertas.entregasEntreguesSemComprovante, 2);
+  assert.equal(response.body.alertas.manutencoesVencidas, 1);
   assert.equal(response.body.produtividade.mediaEntregasPorRota, 2.5);
+  assert.equal(response.body.produtividade.manutencoesConcluidasPeriodo, 2);
   assert.equal(response.body.produtividade.totalComprovantesPeriodo, 5);
   assert.equal(response.body.metricas.receitaTotalPeriodo, 8900.5);
+  assert.equal(response.body.metricas.custoManutencaoPeriodo, 700.35);
   assert.equal(response.body.metricas.lancamentosVencidos, 2);
+  assert.equal(response.body.frota.veiculosMaiorDespesa[0].placa, "ABC1D23");
 });
 
 test("dashboard aplica filtro customizado", async () => {

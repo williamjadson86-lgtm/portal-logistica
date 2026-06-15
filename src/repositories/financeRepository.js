@@ -1,5 +1,6 @@
 const database = require("../config/database");
 const HttpError = require("../errors/HttpError");
+const fleetCostRepository = require("./fleetCostRepository");
 const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapFinancialEntry(row) {
@@ -177,6 +178,89 @@ function buildSelectQuery() {
     LEFT JOIN clientes c ON c.id = lf.cliente_id
     LEFT JOIN entregas e ON e.id = lf.entrega_id
     LEFT JOIN clientes dc ON dc.id = e.cliente_id`;
+}
+
+function isWithinRange(value, start, end) {
+  if (!value || !start || !end) {
+    return false;
+  }
+
+  return value >= start && value <= end;
+}
+
+function formatDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(baseDateText, days) {
+  const date = new Date(`${baseDateText}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatDate(date);
+}
+
+function buildDateSeries(start, end) {
+  if (!start || !end) {
+    return [];
+  }
+
+  const series = [];
+  let cursor = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+
+  while (cursor <= last) {
+    series.push(formatDate(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return series;
+}
+
+function roundCurrency(value) {
+  return Number(Number(value || 0).toFixed(2));
+}
+
+function buildReceivableItem(entry) {
+  return {
+    ...entry,
+    origem: "financeiro",
+    dataReferencia: entry.dataVencimento || entry.dataCompetencia || null,
+  };
+}
+
+function buildPayableItemFromFinance(entry) {
+  return {
+    id: entry.id,
+    origem: "financeiro",
+    tipoOrigem: entry.tipo,
+    descricao: entry.descricao,
+    valor: entry.valor,
+    status: entry.status,
+    dataCompetencia: entry.dataCompetencia,
+    dataVencimento: entry.dataVencimento,
+    dataPagamento: entry.dataPagamento,
+    observacoes: entry.observacoes,
+    cliente: entry.cliente,
+    entrega: entry.entrega,
+    dataReferencia: entry.dataVencimento || entry.dataCompetencia || null,
+  };
+}
+
+function buildPayableItemFromFleet(expense) {
+  return {
+    id: expense.id,
+    origem: "frota",
+    tipoOrigem: expense.tipo,
+    descricao: expense.descricao,
+    valor: expense.valor,
+    status: expense.status,
+    dataCompetencia: expense.dataDespesa,
+    dataVencimento: expense.dataVencimento,
+    dataPagamento: expense.dataPagamento,
+    observacoes: expense.observacoes,
+    veiculo: expense.veiculo,
+    motorista: expense.motorista,
+    dataReferencia: expense.dataVencimento || expense.dataDespesa || null,
+  };
 }
 
 async function listByUserId(actor, filters = {}) {
@@ -512,6 +596,253 @@ async function listSupportData(actor) {
   };
 }
 
+async function getCashFlowData(actor, filters) {
+  const [financialEntries, vehicleExpenses] = await Promise.all([
+    listByUserId(actor),
+    fleetCostRepository.listByUserId(actor, { ativo: true }),
+  ]);
+
+  const receivables = financialEntries
+    .filter((entry) => entry.tipo === "receita" && entry.status !== "cancelado")
+    .map(buildReceivableItem);
+  const payableFinanceEntries = financialEntries
+    .filter((entry) => ["despesa", "repasse"].includes(entry.tipo) && entry.status !== "cancelado")
+    .map(buildPayableItemFromFinance);
+  const payableFleetEntries = vehicleExpenses
+    .filter((expense) => !expense.integrarFinanceiro)
+    .map(buildPayableItemFromFleet);
+  const payables = [...payableFinanceEntries, ...payableFleetEntries];
+
+  const openReceivables = receivables.filter((item) => ["pendente", "faturado"].includes(item.status));
+  const paidReceivables = receivables.filter((item) => item.status === "pago");
+  const openPayables = payables.filter((item) => ["pendente", "faturado"].includes(item.status));
+  const paidPayables = payables.filter((item) => item.status === "pago");
+
+  const receivablesInRange = receivables.filter((item) =>
+    isWithinRange(item.dataReferencia, filters.dataInicio, filters.dataFim),
+  );
+  const payablesInRange = payables.filter((item) =>
+    isWithinRange(item.dataReferencia, filters.dataInicio, filters.dataFim),
+  );
+
+  const totalReceber = roundCurrency(
+    openReceivables
+      .filter((item) => isWithinRange(item.dataReferencia, filters.dataInicio, filters.dataFim))
+      .reduce((sum, item) => sum + item.valor, 0),
+  );
+  const totalPagar = roundCurrency(
+    openPayables
+      .filter((item) => isWithinRange(item.dataReferencia, filters.dataInicio, filters.dataFim))
+      .reduce((sum, item) => sum + item.valor, 0),
+  );
+  const receitasPrevistas = totalReceber;
+  const receitasRecebidas = roundCurrency(
+    paidReceivables
+      .filter((item) => isWithinRange(item.dataPagamento, filters.dataInicio, filters.dataFim))
+      .reduce((sum, item) => sum + item.valor, 0),
+  );
+  const despesasPrevistas = totalPagar;
+  const despesasPagas = roundCurrency(
+    paidPayables
+      .filter((item) => isWithinRange(item.dataPagamento, filters.dataInicio, filters.dataFim))
+      .reduce((sum, item) => sum + item.valor, 0),
+  );
+
+  const saldoAtual = roundCurrency(
+    paidReceivables
+      .filter((item) => item.dataPagamento && item.dataPagamento <= filters.hoje)
+      .reduce((sum, item) => sum + item.valor, 0) -
+      paidPayables
+        .filter((item) => item.dataPagamento && item.dataPagamento <= filters.hoje)
+        .reduce((sum, item) => sum + item.valor, 0),
+  );
+  const saldoProjetado = roundCurrency(saldoAtual + receitasPrevistas - despesasPrevistas);
+  const proximoLimite = addDays(filters.hoje, 7);
+
+  const contasReceber = {
+    itens: receivablesInRange.sort((left, right) =>
+      String(left.dataReferencia || "").localeCompare(String(right.dataReferencia || "")),
+    ),
+    resumo: {
+      totalReceber,
+      vencidos: roundCurrency(
+        openReceivables
+          .filter((item) => item.dataReferencia && item.dataReferencia < filters.hoje)
+          .reduce((sum, item) => sum + item.valor, 0),
+      ),
+      proximosVencimentos: roundCurrency(
+        openReceivables
+          .filter(
+            (item) =>
+              item.dataReferencia &&
+              item.dataReferencia >= filters.hoje &&
+              item.dataReferencia <= proximoLimite,
+          )
+          .reduce((sum, item) => sum + item.valor, 0),
+      ),
+      recebidos: receitasRecebidas,
+    },
+  };
+
+  const contasPagar = {
+    itens: payablesInRange.sort((left, right) =>
+      String(left.dataReferencia || "").localeCompare(String(right.dataReferencia || "")),
+    ),
+    resumo: {
+      totalPagar,
+      vencidos: roundCurrency(
+        openPayables
+          .filter((item) => item.dataReferencia && item.dataReferencia < filters.hoje)
+          .reduce((sum, item) => sum + item.valor, 0),
+      ),
+      proximosVencimentos: roundCurrency(
+        openPayables
+          .filter(
+            (item) =>
+              item.dataReferencia &&
+              item.dataReferencia >= filters.hoje &&
+              item.dataReferencia <= proximoLimite,
+          )
+          .reduce((sum, item) => sum + item.valor, 0),
+      ),
+      pagos: despesasPagas,
+    },
+  };
+
+  const currentMonthStart = `${filters.hoje.slice(0, 8)}01`;
+  const currentMonthEnd = (() => {
+    const base = new Date(`${currentMonthStart}T00:00:00Z`);
+    return formatDate(new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 0)));
+  })();
+  const faturamentoMes = roundCurrency(
+    paidReceivables
+      .filter((item) => isWithinRange(item.dataPagamento, currentMonthStart, currentMonthEnd))
+      .reduce((sum, item) => sum + item.valor, 0),
+  );
+  const despesasMes = roundCurrency(
+    paidPayables
+      .filter((item) => isWithinRange(item.dataPagamento, currentMonthStart, currentMonthEnd))
+      .reduce((sum, item) => sum + item.valor, 0),
+  );
+  const lucroLiquidoMes = roundCurrency(faturamentoMes - despesasMes);
+  const margemOperacionalMes =
+    faturamentoMes === 0 ? 0 : roundCurrency((lucroLiquidoMes / faturamentoMes) * 100);
+  const contasVencidas = openReceivables.filter(
+    (item) => item.dataReferencia && item.dataReferencia < filters.hoje,
+  ).length +
+    openPayables.filter((item) => item.dataReferencia && item.dataReferencia < filters.hoje).length;
+
+  const dateSeries = buildDateSeries(filters.dataInicio, filters.dataFim);
+  const movementByDate = new Map(
+    dateSeries.map((date) => [
+      date,
+      { data: date, receita: 0, despesa: 0, lucro: 0, fluxoAcumulado: 0 },
+    ]),
+  );
+
+  for (const item of paidReceivables) {
+    if (movementByDate.has(item.dataPagamento)) {
+      movementByDate.get(item.dataPagamento).receita += item.valor;
+    }
+  }
+
+  for (const item of paidPayables) {
+    if (movementByDate.has(item.dataPagamento)) {
+      movementByDate.get(item.dataPagamento).despesa += item.valor;
+    }
+  }
+
+  const saldoAnterior = roundCurrency(
+    paidReceivables
+      .filter((item) => item.dataPagamento && item.dataPagamento < filters.dataInicio)
+      .reduce((sum, item) => sum + item.valor, 0) -
+      paidPayables
+        .filter((item) => item.dataPagamento && item.dataPagamento < filters.dataInicio)
+        .reduce((sum, item) => sum + item.valor, 0),
+  );
+  let acumulado = saldoAnterior;
+  const fluxoAcumulado = [...movementByDate.values()].map((item) => {
+    const receita = roundCurrency(item.receita);
+    const despesa = roundCurrency(item.despesa);
+    const lucro = roundCurrency(receita - despesa);
+    acumulado = roundCurrency(acumulado + lucro);
+    return {
+      ...item,
+      receita,
+      despesa,
+      lucro,
+      fluxoAcumulado: acumulado,
+    };
+  });
+
+  const totalReceitaPeriodo = roundCurrency(receivablesInRange.reduce((sum, item) => sum + item.valor, 0));
+  const totalDespesaPeriodo = roundCurrency(payablesInRange.reduce((sum, item) => sum + item.valor, 0));
+  const uniqueClientIds = new Set(receivablesInRange.map((item) => item.clienteId).filter(Boolean));
+  const uniqueDeliveryIds = new Set(receivablesInRange.map((item) => item.entregaId).filter(Boolean));
+  const uniqueVehicleIds = new Set(
+    payables.filter((item) => item.origem === "frota" && item.veiculo?.id).map((item) => item.veiculo.id),
+  );
+  const ticketMedioPorCliente =
+    uniqueClientIds.size === 0 ? 0 : roundCurrency(totalReceitaPeriodo / uniqueClientIds.size);
+  const receitaPorEntrega =
+    uniqueDeliveryIds.size === 0 ? 0 : roundCurrency(totalReceitaPeriodo / uniqueDeliveryIds.size);
+  const custoPorEntrega =
+    uniqueDeliveryIds.size === 0 ? 0 : roundCurrency(totalDespesaPeriodo / uniqueDeliveryIds.size);
+  const lucroPorEntrega =
+    uniqueDeliveryIds.size === 0
+      ? 0
+      : roundCurrency((totalReceitaPeriodo - totalDespesaPeriodo) / uniqueDeliveryIds.size);
+  const receitaPorVeiculo =
+    uniqueVehicleIds.size === 0 ? 0 : roundCurrency(totalReceitaPeriodo / uniqueVehicleIds.size);
+  const custoPorVeiculo =
+    uniqueVehicleIds.size === 0 ? 0 : roundCurrency(totalDespesaPeriodo / uniqueVehicleIds.size);
+  const lucroPorVeiculo =
+    uniqueVehicleIds.size === 0
+      ? 0
+      : roundCurrency((totalReceitaPeriodo - totalDespesaPeriodo) / uniqueVehicleIds.size);
+
+  return {
+    filtros: filters,
+    fluxoCaixa: {
+      saldoAtual,
+      receitasPrevistas,
+      receitasRecebidas,
+      despesasPrevistas,
+      despesasPagas,
+      saldoProjetado,
+    },
+    contasReceber,
+    contasPagar,
+    dashboardFinanceiro: {
+      faturamentoMes,
+      despesasMes,
+      lucroLiquido: lucroLiquidoMes,
+      margemOperacional: margemOperacionalMes,
+      saldoProjetado,
+      contasVencidas,
+      fluxoCaixaAcumulado: fluxoAcumulado.at(-1)?.fluxoAcumulado || saldoAnterior,
+    },
+    graficos: {
+      receitaPorPeriodo: fluxoAcumulado.map((item) => ({ data: item.data, valor: item.receita })),
+      despesaPorPeriodo: fluxoAcumulado.map((item) => ({ data: item.data, valor: item.despesa })),
+      lucroPorPeriodo: fluxoAcumulado.map((item) => ({ data: item.data, valor: item.lucro })),
+      fluxoAcumulado: fluxoAcumulado.map((item) => ({
+        data: item.data,
+        valor: item.fluxoAcumulado,
+      })),
+    },
+    indicadoresEstrategicos: {
+      ticketMedioPorCliente,
+      receitaPorEntrega,
+      custoPorEntrega,
+      lucroPorEntrega,
+      receitaPorVeiculo,
+      custoPorVeiculo,
+      lucroPorVeiculo,
+    },
+  };
+}
+
 module.exports = {
   listByUserId,
   findById,
@@ -522,4 +853,5 @@ module.exports = {
   cancelPendingByDeliveryId,
   createFromDelivery,
   listSupportData,
+  getCashFlowData,
 };

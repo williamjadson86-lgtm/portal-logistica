@@ -57,6 +57,10 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+function createMetricClassName(value) {
+  return Number(value || 0) < 0 ? "negative-indicator" : "";
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -125,8 +129,10 @@ function renderDashboardMetrics(data) {
     { rotulo: "Veiculos disponiveis", valor: data.metricas.veiculosDisponiveis },
     { rotulo: "Veiculos em rota", valor: data.metricas.veiculosEmRota },
     { rotulo: "Veiculos em manutencao", valor: data.metricas.veiculosEmManutencao },
+    { rotulo: "Manutencoes programadas", valor: data.metricas.manutencoesProgramadas || 0 },
     { rotulo: "Receita do periodo", valor: formatCurrency(data.metricas.receitaTotalPeriodo) },
     { rotulo: "Despesas da frota", valor: formatCurrency(data.metricas.totalDespesasFrotaPeriodo) },
+    { rotulo: "Custo de manutencao", valor: formatCurrency(data.metricas.custoManutencaoPeriodo || 0) },
     { rotulo: "Lucro operacional", valor: formatCurrency(data.metricas.lucroOperacionalPeriodo) },
     { rotulo: "Margem operacional", valor: `${data.metricas.margemOperacionalPeriodo}%` },
     { rotulo: "Valores pendentes", valor: formatCurrency(data.metricas.valoresPendentes) },
@@ -198,6 +204,11 @@ function renderDashboardAlerts(data) {
       valor: data.alertas.despesasFrotaVencidas,
       descricao: "Custos operacionais aguardando quitacao.",
     },
+    {
+      titulo: "Manutencoes vencidas",
+      valor: data.alertas.manutencoesVencidas || 0,
+      descricao: "Agendas em atraso que podem comprometer a disponibilidade da frota.",
+    },
   ];
 
   container.innerHTML = alerts
@@ -260,6 +271,11 @@ function renderDashboardProductivity(data) {
       descricao: "Ponto de atencao para encerramento operacional.",
     },
     {
+      titulo: "Manutencoes concluidas",
+      valor: data.produtividade.manutencoesConcluidasPeriodo || 0,
+      descricao: "Ordens de manutencao encerradas dentro do periodo consultado.",
+    },
+    {
       titulo: "Receita total do periodo",
       valor: formatCurrency(data.produtividade.receitaTotalPeriodo),
       descricao: "Receita operacional consolidada na janela filtrada.",
@@ -268,6 +284,11 @@ function renderDashboardProductivity(data) {
       titulo: "Despesas totais da frota",
       valor: formatCurrency(data.produtividade.totalDespesasFrotaPeriodo),
       descricao: "Custos de abastecimento, pedagio e manutencao do periodo.",
+    },
+    {
+      titulo: "Custo de manutencao",
+      valor: formatCurrency(data.produtividade.custoManutencaoPeriodo || 0),
+      descricao: "Parcela do custo operacional dedicada a manutencoes preventivas e corretivas.",
     },
     {
       titulo: "Lucro operacional",
@@ -312,6 +333,114 @@ function renderDashboardProductivity(data) {
       `,
     )
     .join("");
+}
+
+function renderDashboardFleet(data) {
+  const metricsContainer = document.querySelector("[data-dashboard-fleet-metrics]");
+  const rankingContainer = document.querySelector("[data-dashboard-fleet-ranking]");
+
+  if (!metricsContainer || !rankingContainer) {
+    return;
+  }
+
+  const fleet = data.frota || {};
+  const metrics = [
+    {
+      titulo: "Custo total da frota",
+      valor: formatCurrency(fleet.custoTotalFrotaPeriodo),
+      descricao: "Consolidado de despesas operacionais da janela filtrada.",
+    },
+    {
+      titulo: "Custo medio por veiculo",
+      valor: formatCurrency(fleet.custoMedioPorVeiculo),
+      descricao: "Media de custo entre os veiculos com despesa no periodo.",
+    },
+    {
+      titulo: "Custo medio por motorista",
+      valor: formatCurrency(fleet.custoMedioPorMotorista),
+      descricao: "Media de custo entre motoristas com despesa vinculada.",
+    },
+    {
+      titulo: "Custo de manutencao",
+      valor: formatCurrency(fleet.custoManutencaoPeriodo || 0),
+      descricao: "Custos de manutencao refletidos no resultado operacional da frota.",
+    },
+    {
+      titulo: "Lucro liquido",
+      valor: formatCurrency(fleet.lucroLiquidoPeriodo),
+      descricao: "Resultado apos confrontar receita operacional e custos da frota.",
+      className: createMetricClassName(fleet.lucroLiquidoPeriodo),
+    },
+    {
+      titulo: "Margem operacional",
+      valor: `${fleet.margemOperacionalPeriodo || 0}%`,
+      descricao: Number(fleet.margemOperacionalPeriodo || 0) < 0
+        ? "Margem negativa: operar com atencao imediata."
+        : "Margem consolidada sobre a receita operacional do periodo.",
+      className: createMetricClassName(fleet.margemOperacionalPeriodo),
+    },
+    {
+      titulo: "Manutencoes vencidas",
+      valor: fleet.manutencoesVencidas || 0,
+      descricao: "Quantidade de manutencoes agendadas ou em execucao com prazo estourado.",
+    },
+  ];
+
+  metricsContainer.innerHTML = metrics
+    .map(
+      (item) => `
+        <article class="data-card">
+          <h3>${item.titulo}</h3>
+          <strong class="${item.className || ""}">${item.valor}</strong>
+          <p>${item.descricao}</p>
+        </article>
+      `,
+    )
+    .join("");
+
+  const topVehicles = Array.isArray(fleet.veiculosMaiorDespesa) ? fleet.veiculosMaiorDespesa : [];
+  const topDrivers = Array.isArray(fleet.motoristasMaiorDespesa) ? fleet.motoristasMaiorDespesa : [];
+
+  if (topVehicles.length === 0 && topDrivers.length === 0) {
+    rankingContainer.innerHTML = `
+      <article class="data-card empty">
+        <strong>Sem despesas consolidadas</strong>
+        <p>Cadastre despesas para visualizar os maiores impactos de custo da frota.</p>
+      </article>
+    `;
+    return;
+  }
+
+  rankingContainer.innerHTML = `
+    <article class="data-card">
+      <h3>Veiculos com maior despesa</h3>
+      ${
+        topVehicles.length > 0
+          ? topVehicles
+              .map(
+                (item, index) => `
+                  <p>${index + 1}. ${item.placa} | ${formatCurrency(item.custoTotal)}</p>
+                `,
+              )
+              .join("")
+          : "<p>Nenhum veiculo com despesa no periodo.</p>"
+      }
+    </article>
+    <article class="data-card">
+      <h3>Motoristas com maior despesa</h3>
+      ${
+        topDrivers.length > 0
+          ? topDrivers
+              .map(
+                (item, index) => `
+                  <p>${index + 1}. ${item.nome} | ${formatCurrency(item.custoTotal)}</p>
+                `,
+              )
+              .join("")
+          : "<p>Nenhum motorista com despesa vinculada no periodo.</p>"
+      }
+    </article>
+  `;
 }
 
 function formatPeriodLabel(filter) {
@@ -396,6 +525,7 @@ async function loadHome() {
       renderDashboardMetrics(dashboardData);
       renderDashboardAlerts(dashboardData);
       renderDashboardProductivity(dashboardData);
+      renderDashboardFleet(dashboardData);
       periodLabel.textContent = formatPeriodLabel(dashboardData.filtro);
     } catch (error) {
       if (

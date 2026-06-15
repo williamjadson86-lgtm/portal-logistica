@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Fluxo de Caixa</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell reports-page" data-cash-flow-app>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Fluxo de caixa</span>
+            <h1>Gestao financeira avancada</h1>
+            <p>Consolide recebimentos, pagamentos, saldo projetado e indicadores estrategicos da operacao.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <a class="button ghost" href="/financeiro">Abrir financeiro</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-cash-flow-message></div>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Periodo</span>
+              <h2>Filtrar fluxo financeiro</h2>
+            </div>
+            <div class="row-actions">
+              <button class="button ghost" type="button" data-cash-flow-refresh-button>Atualizar</button>
+              <button class="button ghost" type="button" data-cash-flow-export-button>Fluxo CSV</button>
+              <button class="button ghost" type="button" data-cash-flow-export-excel-button>Fluxo Excel</button>
+            </div>
+          </div>
+
+          <form class="grid-form two-columns" data-cash-flow-filter-form>
+            <div class="field">
+              <label for="cashFlowPeriodo">Periodo</label>
+              <select id="cashFlowPeriodo" name="periodo" data-cash-flow-period>
+                <option value="today">Hoje</option>
+                <option value="7d" selected>Ultimos 7 dias</option>
+                <option value="30d">Ultimos 30 dias</option>
+                <option value="month">Mes atual</option>
+                <option value="custom">Personalizado</option>
+              </select>
+            </div>
+
+            <div class="cash-flow-custom-range" data-cash-flow-custom-range hidden>
+              <div class="field">
+                <label for="cashFlowInicio">Data inicial</label>
+                <input id="cashFlowInicio" name="dataInicio" type="date" />
+              </div>
+
+              <div class="field">
+                <label for="cashFlowFim">Data final</label>
+                <input id="cashFlowFim" name="dataFim" type="date" />
+              </div>
+            </div>
+
+            <div class="actions field full">
+              <button class="button primary" type="submit">Aplicar filtros</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="module-summary-grid" data-cash-flow-summary></section>
+        <section class="module-summary-grid" data-cash-flow-dashboard-summary></section>
+        <section class="module-summary-grid" data-cash-flow-strategic-summary></section>
+
+        <section class="dashboard-two-columns">
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Graficos</span>
+                <h2>Receita, despesa e lucro</h2>
+              </div>
+            </div>
+            <div class="module-list" data-cash-flow-charts-main></div>
+          </article>
+
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Fluxo acumulado</span>
+                <h2>Saldo projetado no periodo</h2>
+              </div>
+            </div>
+            <div class="module-list" data-cash-flow-charts-balance></div>
+          </article>
+        </section>
+
+        <section class="dashboard-two-columns">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Contas a receber</span>
+                <h2>Receitas do periodo</h2>
+              </div>
+              <div class="row-actions">
+                <button class="button ghost" type="button" data-cash-flow-receivables-export-button>
+                  Receber CSV
+                </button>
+                <button
+                  class="button ghost"
+                  type="button"
+                  data-cash-flow-receivables-export-excel-button
+                >
+                  Receber Excel
+                </button>
+              </div>
+            </div>
+
+            <section class="module-summary-grid compact-grid" data-cash-flow-receivables-summary></section>
+
+            <div class="table-shell">
+              <table class="deliveries-table">
+                <thead>
+                  <tr>
+                    <th>Descricao</th>
+                    <th>Cliente</th>
+                    <th>Entrega</th>
+                    <th>Status</th>
+                    <th>Vencimento</th>
+                    <th>Pagamento</th>
+                    <th>Valor</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody data-cash-flow-receivables-table-body>
+                  <tr><td colspan="8">Carregando contas a receber...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Contas a pagar</span>
+                <h2>Pagamentos do periodo</h2>
+              </div>
+              <div class="row-actions">
+                <button class="button ghost" type="button" data-cash-flow-payables-export-button>
+                  Pagar CSV
+                </button>
+                <button
+                  class="button ghost"
+                  type="button"
+                  data-cash-flow-payables-export-excel-button
+                >
+                  Pagar Excel
+                </button>
+              </div>
+            </div>
+
+            <section class="module-summary-grid compact-grid" data-cash-flow-payables-summary></section>
+
+            <div class="table-shell">
+              <table class="deliveries-table">
+                <thead>
+                  <tr>
+                    <th>Origem</th>
+                    <th>Descricao</th>
+                    <th>Status</th>
+                    <th>Vencimento</th>
+                    <th>Pagamento</th>
+                    <th>Valor</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody data-cash-flow-payables-table-body>
+                  <tr><td colspan="7">Carregando contas a pagar...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/cashFlow.js"></script>
+  </body>
+</html>

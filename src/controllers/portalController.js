@@ -43,6 +43,12 @@ const cards = [
     href: "/veiculos",
   },
   {
+    titulo: "Manutencoes",
+    icone: "MN",
+    descricao: "Planeje manutencoes preventivas, corretivas e acompanhe alertas de vencimento.",
+    href: "/manutencoes-veiculos",
+  },
+  {
     titulo: "Comprovantes",
     icone: "CP",
     descricao: "Acesse comprovantes e protocolos.",
@@ -53,6 +59,12 @@ const cards = [
     icone: "FN",
     descricao: "Visualize repasses e movimentacoes.",
     href: "/financeiro",
+  },
+  {
+    titulo: "Custos da Frota",
+    icone: "FT",
+    descricao: "Controle despesas operacionais por veiculo e motorista.",
+    href: "/custos-frota",
   },
   {
     titulo: "Relatorios",

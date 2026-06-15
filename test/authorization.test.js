@@ -95,15 +95,43 @@ test("motorista pode abrir comprovantes mas nao pode criar entregas", async () =
 test("financeiro acessa financeiro e relatorios, mas nao motoristas", async () => {
   mockUser("financeiro");
 
-  const [financePage, reportsPage, driversApi] = await Promise.all([
+  const [financePage, reportsPage, fleetPage, driversApi] = await Promise.all([
     request(app).get("/financeiro").set("Cookie", createCookie("financeiro")),
     request(app).get("/relatorios").set("Cookie", createCookie("financeiro")),
+    request(app).get("/custos-frota").set("Cookie", createCookie("financeiro")),
     request(app).get("/api/motoristas").set("Cookie", createCookie("financeiro")),
   ]);
 
   assert.equal(financePage.status, 200);
   assert.equal(reportsPage.status, 200);
+  assert.equal(fleetPage.status, 200);
   assert.equal(driversApi.status, 403);
+});
+
+test("colaborador nao acessa custos da frota e operador acessa o modulo", async () => {
+  mockUser("colaborador");
+  const [deniedResponse, deniedApiResponse, deniedMaintenancePage, deniedMaintenanceApi] = await Promise.all([
+    request(app).get("/custos-frota").set("Cookie", createCookie("colaborador")),
+    request(app).get("/api/custos-frota").set("Cookie", createCookie("colaborador")),
+    request(app).get("/manutencoes-veiculos").set("Cookie", createCookie("colaborador")),
+    request(app).get("/api/manutencoes-veiculos").set("Cookie", createCookie("colaborador")),
+  ]);
+
+  assert.equal(deniedResponse.status, 302);
+  assert.match(deniedResponse.headers.location, /^\/acesso-negado/);
+  assert.equal(deniedApiResponse.status, 403);
+  assert.equal(deniedMaintenancePage.status, 302);
+  assert.match(deniedMaintenancePage.headers.location, /^\/acesso-negado/);
+  assert.equal(deniedMaintenanceApi.status, 403);
+
+  mockUser("operador");
+  const [allowedResponse, allowedMaintenanceResponse] = await Promise.all([
+    request(app).get("/custos-frota").set("Cookie", createCookie("operador")),
+    request(app).get("/manutencoes-veiculos").set("Cookie", createCookie("operador")),
+  ]);
+
+  assert.equal(allowedResponse.status, 200);
+  assert.equal(allowedMaintenanceResponse.status, 200);
 });
 
 test("administrador mantem acesso total e visualiza todos os cards da home", async () => {
@@ -126,5 +154,7 @@ test("administrador mantem acesso total e visualiza todos os cards da home", asy
     .set("Cookie", createCookie("administrador"));
 
   assert.equal(response.status, 200);
-  assert.equal(response.body.cards.length, 13);
+  assert.equal(response.body.cards.length, 15);
+  assert.ok(response.body.cards.some((card) => card.href === "/custos-frota"));
+  assert.ok(response.body.cards.some((card) => card.href === "/manutencoes-veiculos"));
 });

@@ -107,6 +107,15 @@ test("despesas de veiculos exigem autenticacao", async () => {
   assert.equal(response.body.erro, "Autenticacao obrigatoria");
 });
 
+test("nova tela de custos da frota carrega autenticada", async () => {
+  mockAuthenticatedUser();
+
+  const response = await request(app).get("/custos-frota").set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.match(response.text, /Custos da Frota|Custos da frota/);
+});
+
 test("lista despesas da frota com resumo e apoio", async () => {
   mockAuthenticatedUser();
   fleetCostRepository.listByUserId = async () => [
@@ -136,6 +145,26 @@ test("lista despesas da frota com resumo e apoio", async () => {
   assert.equal(response.body.resumo.totalIntegradasFinanceiro, 1);
   assert.equal(response.body.resumo.totalControleInterno, 1);
   assert.equal(response.body.apoio.veiculos.length, 1);
+});
+
+test("rota dedicada lista despesas com filtros", async () => {
+  mockAuthenticatedUser();
+  let receivedFilters = null;
+  fleetCostRepository.listByUserId = async (_user, filters) => {
+    receivedFilters = filters;
+    return [createExpense()];
+  };
+  fleetCostRepository.listSupportData = async () => ({ veiculos: [], motoristas: [] });
+
+  const response = await request(app)
+    .get("/api/custos-frota?veiculoId=77a306c2-658d-473b-9631-e4a6416286fe&tipo=abastecimento&dataInicio=2026-06-01&dataFim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(receivedFilters.veiculoId, "77a306c2-658d-473b-9631-e4a6416286fe");
+  assert.equal(receivedFilters.tipo, "abastecimento");
+  assert.equal(receivedFilters.dataInicio, "2026-06-01");
+  assert.equal(receivedFilters.dataFim, "2026-06-30");
 });
 
 test("cria despesa sem integracao financeira automatica", async () => {

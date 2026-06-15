@@ -54,6 +54,18 @@ function createFinancialApp() {
     return query.toString();
   }
 
+  function createFinanceBadge(expense) {
+    if (expense.status === "cancelado") {
+      return '<span class="status-tag status-tag--danger">Cancelada</span>';
+    }
+
+    if (expense.integrarFinanceiro) {
+      return '<span class="status-tag status-tag--success">Integrada</span>';
+    }
+
+    return '<span class="status-tag status-tag--neutral">Nao integrada</span>';
+  }
+
   function renderSummaryCards(data) {
     const cards = [
       { rotulo: "Total pendente", valor: formatCurrency(data.totalPendente) },
@@ -507,7 +519,7 @@ function createFleetCostApp() {
             <td>${createStatusLabel(expense.tipo)}</td>
             <td>${expense.veiculo ? `${expense.veiculo.placa} - ${expense.veiculo.modelo}` : "-"}</td>
             <td>${expense.motorista?.nome || "-"}</td>
-            <td>${expense.integrarFinanceiro ? "Integrado" : "Interno"}</td>
+            <td>${createFinanceBadge(expense)}</td>
             <td><span class="status-tag">${createStatusLabel(expense.status)}</span></td>
             <td>${expense.dataDespesa || "-"}</td>
             <td>${formatCurrency(expense.valor)}</td>

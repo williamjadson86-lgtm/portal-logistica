@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Manutencoes de Veiculos</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main class="portal-shell deliveries-page" data-vehicle-maintenance-page>
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Manutencoes da frota</span>
+            <h1>Planejamento e execucao de manutencoes</h1>
+            <p>Gerencie agendas, custos, integracao financeira e alertas de manutencao vencida.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <a class="button ghost" href="/veiculos">Abrir veiculos</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-vehicle-maintenance-message></div>
+        <section class="module-summary-grid" data-vehicle-maintenance-summary></section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Filtros</span>
+                <h2>Refinar manutencoes</h2>
+              </div>
+              <button class="button ghost" type="button" data-vehicle-maintenance-refresh-button>
+                Atualizar
+              </button>
+            </div>
+
+            <form class="grid-form two-columns" data-vehicle-maintenance-filter-form>
+              <div class="field">
+                <label for="vehicleMaintenanceFilterVeiculo">Veiculo</label>
+                <select id="vehicleMaintenanceFilterVeiculo" name="veiculoId">
+                  <option value="">Todos os veiculos</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceFilterStatus">Status</label>
+                <select id="vehicleMaintenanceFilterStatus" name="status">
+                  <option value="">Todos</option>
+                  <option value="agendada">Agendada</option>
+                  <option value="em_execucao">Em execucao</option>
+                  <option value="concluida">Concluida</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceFilterTipo">Tipo</label>
+                <input id="vehicleMaintenanceFilterTipo" name="tipo" maxlength="40" />
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceFilterInicio">Data inicial</label>
+                <input id="vehicleMaintenanceFilterInicio" name="dataInicio" type="date" />
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceFilterFim">Data final</label>
+                <input id="vehicleMaintenanceFilterFim" name="dataFim" type="date" />
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit">Aplicar filtros</button>
+                <button class="button ghost" type="button" data-vehicle-maintenance-clear-filters-button>
+                  Limpar filtros
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Cadastro</span>
+                <h2 data-vehicle-maintenance-form-title>Nova manutencao</h2>
+              </div>
+              <button class="button ghost" type="button" data-vehicle-maintenance-new-button>
+                Nova manutencao
+              </button>
+            </div>
+
+            <form class="grid-form two-columns" data-vehicle-maintenance-form>
+              <input type="hidden" name="id" />
+
+              <div class="field">
+                <label for="vehicleMaintenanceTipo">Tipo</label>
+                <input id="vehicleMaintenanceTipo" name="tipo" maxlength="40" required />
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceStatus">Status</label>
+                <select id="vehicleMaintenanceStatus" name="status" required>
+                  <option value="agendada">Agendada</option>
+                  <option value="em_execucao">Em execucao</option>
+                  <option value="concluida">Concluida</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+
+              <div class="field full">
+                <label for="vehicleMaintenanceDescricao">Descricao</label>
+                <input id="vehicleMaintenanceDescricao" name="descricao" maxlength="160" required />
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceVeiculo">Veiculo</label>
+                <select id="vehicleMaintenanceVeiculo" name="veiculoId" required>
+                  <option value="">Selecione um veiculo</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceCusto">Custo</label>
+                <input id="vehicleMaintenanceCusto" name="custo" type="number" min="0" step="0.01" required />
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceData">Data da manutencao</label>
+                <input id="vehicleMaintenanceData" name="dataManutencao" type="date" required />
+              </div>
+
+              <div class="field">
+                <label for="vehicleMaintenanceNextDate">Proxima manutencao</label>
+                <input id="vehicleMaintenanceNextDate" name="proximaManutencao" type="date" />
+              </div>
+
+              <div class="field full">
+                <label class="checkbox-field" for="vehicleMaintenanceIntegrarFinanceiro">
+                  <input
+                    id="vehicleMaintenanceIntegrarFinanceiro"
+                    name="integrarFinanceiro"
+                    type="checkbox"
+                    checked
+                  />
+                  Integrar custo automaticamente com despesas da frota e financeiro
+                </label>
+              </div>
+
+              <div class="field full">
+                <label for="vehicleMaintenanceObservacoes">Observacoes</label>
+                <textarea id="vehicleMaintenanceObservacoes" name="observacoes" rows="4" maxlength="2000"></textarea>
+              </div>
+
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-vehicle-maintenance-submit-button>
+                  Salvar manutencao
+                </button>
+                <button class="button ghost" type="button" data-vehicle-maintenance-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Agenda e historico</span>
+              <h2>Manutencoes registradas</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Descricao</th>
+                  <th>Tipo</th>
+                  <th>Veiculo</th>
+                  <th>Financeiro</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                  <th>Proxima</th>
+                  <th>Custo</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-vehicle-maintenance-table-body>
+                <tr><td colspan="9">Carregando manutencoes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/vehicleMaintenance.js"></script>
+  </body>
+</html>

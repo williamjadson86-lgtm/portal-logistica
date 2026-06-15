@@ -574,6 +574,77 @@ textarea {
   text-transform: capitalize;
 }
 
+.status-tag--success {
+  background: rgba(18, 135, 84, 0.14);
+  color: #0e6a43;
+}
+
+.status-tag--danger {
+  background: rgba(182, 38, 38, 0.14);
+  color: #962121;
+}
+
+.status-tag--neutral {
+  background: rgba(90, 103, 125, 0.14);
+  color: #475467;
+}
+
+.status-tag--warning {
+  background: rgba(209, 120, 18, 0.16);
+  color: #9a5800;
+}
+
+.negative-indicator {
+  color: #b42318;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.cash-flow-custom-range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.compact-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mini-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.mini-chart-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(19, 34, 56, 0.08);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(25, 54, 184, 0.65), rgba(12, 145, 214, 0.8));
+}
+
 .data-card.empty {
   text-align: center;
 }

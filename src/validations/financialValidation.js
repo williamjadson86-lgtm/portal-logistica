@@ -1,5 +1,6 @@
 const FINANCIAL_TYPES = ["receita", "despesa", "repasse"];
 const FINANCIAL_STATUSES = ["pendente", "faturado", "pago", "cancelado"];
+const CASH_FLOW_PERIODS = ["today", "7d", "30d", "month", "custom"];
 
 function isValidUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -242,14 +243,82 @@ function validateFinancialFilters(input) {
   return { errors, data };
 }
 
+function formatDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftDays(referenceDate, days) {
+  const date = new Date(referenceDate);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date;
+}
+
+function validateCashFlowFilters(input, referenceDate = new Date()) {
+  const errors = [];
+  const data = {};
+  const periodo = parseText(input.periodo) || "7d";
+
+  if (!CASH_FLOW_PERIODS.includes(periodo)) {
+    errors.push("periodo invalido");
+  }
+
+  const today = new Date(`${formatDate(referenceDate)}T00:00:00Z`);
+  let dataInicio = null;
+  let dataFim = null;
+
+  if (periodo === "custom") {
+    dataInicio = parseOptionalText(input.dataInicio);
+    dataFim = parseOptionalText(input.dataFim);
+
+    if (!dataInicio || !dataFim) {
+      errors.push("dataInicio e dataFim devem ser informadas para periodo custom");
+    }
+  } else if (periodo === "today") {
+    dataInicio = formatDate(today);
+    dataFim = formatDate(today);
+  } else if (periodo === "7d") {
+    dataInicio = formatDate(shiftDays(today, -6));
+    dataFim = formatDate(today);
+  } else if (periodo === "30d") {
+    dataInicio = formatDate(shiftDays(today, -29));
+    dataFim = formatDate(today);
+  } else if (periodo === "month") {
+    const firstDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const lastDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
+    dataInicio = formatDate(firstDay);
+    dataFim = formatDate(lastDay);
+  }
+
+  if (dataInicio && !isValidDate(dataInicio)) {
+    errors.push("dataInicio deve estar no formato YYYY-MM-DD");
+  }
+
+  if (dataFim && !isValidDate(dataFim)) {
+    errors.push("dataFim deve estar no formato YYYY-MM-DD");
+  }
+
+  if (dataInicio && dataFim && dataInicio > dataFim) {
+    errors.push("dataInicio nao pode ser maior que dataFim");
+  }
+
+  data.periodo = periodo;
+  data.dataInicio = dataInicio;
+  data.dataFim = dataFim;
+  data.hoje = formatDate(today);
+
+  return { errors, data };
+}
+
 module.exports = {
   FINANCIAL_TYPES,
   FINANCIAL_STATUSES,
+  CASH_FLOW_PERIODS,
   isValidUuid,
   validateFinancialCreate: (input) => validateFinancialPayload(input),
   validateFinancialUpdate: (input) => validateFinancialPayload(input, { partial: true }),
   validateFinancialStatusUpdate,
   validateFinancialFilters,
+  validateCashFlowFilters,
   validateFinancialCreateFromDelivery: (input) =>
     validateFinancialPayload(input, { requireLinkedDelivery: true }),
 };

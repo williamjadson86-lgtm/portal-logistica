@@ -1,5 +1,6 @@
 const HttpError = require("../errors/HttpError");
 const repository = require("../repositories/fleetCostRepository");
+const resolveView = require("../utils/viewResolver");
 const { isValidUuid } = require("../validations/financialValidation");
 const {
   validateVehicleExpenseCreate,
@@ -17,6 +18,10 @@ function ensureFound(expense) {
   if (!expense) {
     throw new HttpError(404, "Despesa de veiculo nao encontrada");
   }
+}
+
+function page(_req, res) {
+  res.sendFile(resolveView("custos-frota.html"));
 }
 
 function buildSummary(items) {
@@ -129,6 +134,7 @@ async function remove(req, res) {
 }
 
 module.exports = {
+  page,
   list,
   show,
   create,

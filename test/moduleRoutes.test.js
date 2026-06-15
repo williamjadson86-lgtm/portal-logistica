@@ -16,6 +16,9 @@ const supportRepository = require("../src/repositories/supportRepository");
 const clientRepository = require("../src/repositories/clientRepository");
 const driverRepository = require("../src/repositories/driverRepository");
 const vehicleRepository = require("../src/repositories/vehicleRepository");
+const fleetCostRepository = require("../src/repositories/fleetCostRepository");
+const vehicleMaintenanceRepository = require("../src/repositories/vehicleMaintenanceRepository");
+const cashFlowRepository = require("../src/repositories/financeRepository");
 const app = require("../src/app");
 
 const originalRepositories = {
@@ -36,6 +39,10 @@ const originalRepositories = {
   listClients: clientRepository.listByUserId,
   listDrivers: driverRepository.listByUserId,
   listVehicles: vehicleRepository.listByUserId,
+  listFleetCosts: fleetCostRepository.listByUserId,
+  fleetSupportData: fleetCostRepository.listSupportData,
+  listMaintenances: vehicleMaintenanceRepository.listByUserId,
+  maintenanceSupportData: vehicleMaintenanceRepository.listSupportData,
 };
 
 const modulePages = [
@@ -45,8 +52,11 @@ const modulePages = [
   "/clientes",
   "/motoristas",
   "/veiculos",
+  "/manutencoes-veiculos",
   "/comprovantes",
   "/financeiro",
+  "/custos-frota",
+  "/fluxo-caixa",
   "/relatorios",
   "/documentos",
   "/suporte",
@@ -75,6 +85,10 @@ function restoreRepositories() {
   clientRepository.listByUserId = originalRepositories.listClients;
   driverRepository.listByUserId = originalRepositories.listDrivers;
   vehicleRepository.listByUserId = originalRepositories.listVehicles;
+  fleetCostRepository.listByUserId = originalRepositories.listFleetCosts;
+  fleetCostRepository.listSupportData = originalRepositories.fleetSupportData;
+  vehicleMaintenanceRepository.listByUserId = originalRepositories.listMaintenances;
+  vehicleMaintenanceRepository.listSupportData = originalRepositories.maintenanceSupportData;
 }
 
 function createCookie(tipoUsuario = "administrador") {
@@ -125,7 +139,9 @@ test("home api retorna dashboard de entregas autenticado", async () => {
   assert.equal(response.body.dashboard.totalEntregas, 7);
   assert.equal(response.body.dashboard.entregasEntregues, 4);
   assert.equal(response.body.rotas.rotasPlanejadas, 2);
-  assert.equal(response.body.cards.length, 9);
+  assert.equal(response.body.cards.length, 11);
+  assert.ok(response.body.cards.some((card) => card.href === "/custos-frota"));
+  assert.ok(response.body.cards.some((card) => card.href === "/manutencoes-veiculos"));
 });
 
 test("modulos html exigem autenticacao", async () => {
@@ -336,12 +352,75 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
       status: "disponivel",
     },
   ];
+  fleetCostRepository.listByUserId = async () => [
+    {
+      id: "c48db777-f901-4536-b36c-cac80b97461f",
+      descricao: "Diesel urbano",
+      tipo: "abastecimento",
+      valor: 240.5,
+      status: "pendente",
+      dataDespesa: "2026-06-09",
+      integrarFinanceiro: true,
+      veiculo: {
+        placa: "ABC1D23",
+        modelo: "Sprinter",
+      },
+      motorista: {
+        nome: "Marcio Lima",
+      },
+    },
+  ];
+  fleetCostRepository.listSupportData = async () => ({
+    veiculos: [
+      {
+        id: "9d1f2f93-422a-4dd6-b443-5286b6a3fb38",
+        placa: "ABC1D23",
+        modelo: "Sprinter",
+        status: "disponivel",
+      },
+    ],
+    motoristas: [
+      {
+        id: "9f96ec45-2773-4afb-b596-053f9a9926d3",
+        nome: "Marcio Lima",
+        status: "ativo",
+      },
+    ],
+  });
+  vehicleMaintenanceRepository.listByUserId = async () => [
+    {
+      id: "5ccf6818-220f-48f4-8ce4-5ff4ad25f9b0",
+      descricao: "Revisao preventiva",
+      tipo: "preventiva",
+      custo: 860,
+      status: "agendada",
+      dataManutencao: "2026-06-09",
+      proximaManutencao: "2026-06-20",
+      integrarFinanceiro: true,
+      veiculo: {
+        placa: "ABC1D23",
+        modelo: "Sprinter",
+      },
+    },
+  ];
+  vehicleMaintenanceRepository.listSupportData = async () => ({
+    veiculos: [
+      {
+        id: "9d1f2f93-422a-4dd6-b443-5286b6a3fb38",
+        placa: "ABC1D23",
+        modelo: "Sprinter",
+        status: "disponivel",
+      },
+    ],
+  });
 
   const apiResponses = await Promise.all([
     request(app).get("/api/perfil").set("Cookie", createCookie("administrador")),
     request(app).get("/api/rotas").set("Cookie", createCookie("administrador")),
     request(app).get("/api/comprovantes").set("Cookie", createCookie("administrador")),
     request(app).get("/api/financeiro").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/custos-frota").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/manutencoes-veiculos").set("Cookie", createCookie("administrador")),
     request(app).get("/api/documentos").set("Cookie", createCookie("administrador")),
     request(app).get("/api/suporte").set("Cookie", createCookie("administrador")),
     request(app).get("/api/clientes").set("Cookie", createCookie("administrador")),
@@ -355,9 +434,11 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
   assert.equal(apiResponses[1].body.rotas[0].codigo, "ROT-001");
   assert.equal(apiResponses[2].body.comprovantes[0].arquivoNome, "canhoto.jpg");
   assert.equal(apiResponses[3].body.lancamentos[0].descricao, "Repasse semanal");
-  assert.equal(apiResponses[6].body.clientes[0].nome, "Acme Logistica");
-  assert.equal(apiResponses[7].body.itens.length, 1);
-  assert.equal(apiResponses[8].body.resumo[0].valor, "claro");
-  assert.equal(apiResponses[9].body.motoristas[0].nome, "Marcio Lima");
-  assert.equal(apiResponses[10].body.veiculos[0].placa, "ABC1D23");
+  assert.equal(apiResponses[4].body.despesas[0].descricao, "Diesel urbano");
+  assert.equal(apiResponses[5].body.manutencoes[0].descricao, "Revisao preventiva");
+  assert.equal(apiResponses[8].body.clientes[0].nome, "Acme Logistica");
+  assert.equal(apiResponses[9].body.itens.length, 1);
+  assert.equal(apiResponses[10].body.resumo[0].valor, "claro");
+  assert.equal(apiResponses[11].body.motoristas[0].nome, "Marcio Lima");
+  assert.equal(apiResponses[12].body.veiculos[0].placa, "ABC1D23");
 });
