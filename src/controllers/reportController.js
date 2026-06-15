@@ -126,6 +126,24 @@ function buildExportXlsxFileName(filters) {
   return `relatorios_clientes_${suffix}.xlsx`;
 }
 
+function buildFleetExportFileName(filters) {
+  const suffix =
+    filters.dataInicio && filters.dataFim
+      ? `${filters.dataInicio}_${filters.dataFim}`
+      : new Date().toISOString().slice(0, 10);
+
+  return `relatorios_frota_${suffix}.csv`;
+}
+
+function buildFleetExportXlsxFileName(filters) {
+  const suffix =
+    filters.dataInicio && filters.dataFim
+      ? `${filters.dataInicio}_${filters.dataFim}`
+      : new Date().toISOString().slice(0, 10);
+
+  return `relatorios_frota_${suffix}.xlsx`;
+}
+
 function formatPeriodLabel(filters) {
   if (filters.dataInicio && filters.dataFim) {
     return `${filters.dataInicio} ate ${filters.dataFim}`;
@@ -184,6 +202,44 @@ function parseExcelDate(value) {
   }
 
   return new Date(`${value}T00:00:00`);
+}
+
+function buildFleetCostsCsv(report) {
+  const header = [
+    "categoria",
+    "identificador",
+    "descricao",
+    "total de entregas",
+    "receita total",
+    "despesa total",
+    "resultado liquido",
+    "margem",
+  ];
+
+  const vehicleRows = report.veiculos.map((item) => [
+    "veiculo",
+    item.placa,
+    item.modelo,
+    item.totalEntregas,
+    item.receitaTotal.toFixed(2),
+    item.despesaTotal.toFixed(2),
+    item.lucro.toFixed(2),
+    `${item.margem.toFixed(2)}%`,
+  ]);
+  const driverRows = report.motoristas.map((item) => [
+    "motorista",
+    item.nome,
+    item.status,
+    item.totalEntregas,
+    item.receitaTotal.toFixed(2),
+    item.despesaTotal.toFixed(2),
+    item.lucro.toFixed(2),
+    `${item.margem.toFixed(2)}%`,
+  ]);
+
+  return [header, ...vehicleRows, ...driverRows]
+    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
+    .join("\n");
 }
 
 function createSummaryWorksheet(workbook, report) {
@@ -312,6 +368,98 @@ async function buildClientsWorkbook(report) {
   return workbook.xlsx.writeBuffer();
 }
 
+function createFleetSummaryWorksheet(workbook, report, filters) {
+  const worksheet = workbook.addWorksheet("Resumo Frota");
+  worksheet.addRow(["Indicador", "Valor"]);
+  worksheet.addRows([
+    ["Periodo aplicado", formatPeriodLabel(filters)],
+    ["Receita operacional", report.resumo.receitaTotal],
+    ["Despesa operacional", report.resumo.despesaTotal],
+    ["Lucro operacional", report.resumo.lucroOperacional],
+    ["Resultado liquido", report.resumo.lucroOperacional],
+    ["Margem operacional", report.resumo.margemOperacional / 100],
+    ["Veiculos com movimento", report.resumo.totalVeiculosComMovimento],
+    ["Motoristas com movimento", report.resumo.totalMotoristasComMovimento],
+    ["Lancamentos vencidos", report.resumo.lancamentosVencidos],
+  ]);
+
+  applyWorksheetChrome(worksheet);
+  worksheet.getCell("B3").numFmt = '"R$" #,##0.00';
+  worksheet.getCell("B4").numFmt = '"R$" #,##0.00';
+  worksheet.getCell("B5").numFmt = '"R$" #,##0.00';
+  worksheet.getCell("B6").numFmt = '"R$" #,##0.00';
+  worksheet.getCell("B7").numFmt = "0.00%";
+  autoSizeColumns(worksheet);
+}
+
+function createFleetBreakdownWorksheet(workbook, name, rows, kind) {
+  const worksheet = workbook.addWorksheet(name);
+  worksheet.addRow([
+    kind === "veiculo" ? "Placa" : "Motorista",
+    "Descricao",
+    "Status",
+    "Total de entregas",
+    "Receita total",
+    "Despesa total",
+    "Resultado liquido",
+    "Margem",
+  ]);
+
+  rows.forEach((item) => {
+    worksheet.addRow([
+      kind === "veiculo" ? item.placa : item.nome,
+      kind === "veiculo" ? item.modelo : item.nome,
+      item.status,
+      item.totalEntregas,
+      item.receitaTotal,
+      item.despesaTotal,
+      item.lucro,
+      item.margem / 100,
+    ]);
+  });
+
+  applyWorksheetChrome(worksheet);
+  applyCurrencyFormat(worksheet, [5, 6, 7]);
+  worksheet.getColumn(8).numFmt = "0.00%";
+  autoSizeColumns(worksheet);
+}
+
+function createFleetExpensesWorksheet(workbook, report) {
+  const worksheet = workbook.addWorksheet("Maiores Despesas");
+  worksheet.addRow(["Descricao", "Tipo", "Veiculo", "Motorista", "Status", "Data", "Valor"]);
+
+  report.ranking.maioresDespesas.forEach((item) => {
+    worksheet.addRow([
+      item.descricao,
+      item.tipo,
+      item.veiculo ? `${item.veiculo.placa} - ${item.veiculo.modelo}` : "",
+      item.motorista?.nome || "",
+      item.status,
+      parseExcelDate(item.dataDespesa),
+      item.valor,
+    ]);
+  });
+
+  applyWorksheetChrome(worksheet);
+  applyDateFormat(worksheet, [6]);
+  applyCurrencyFormat(worksheet, [7]);
+  autoSizeColumns(worksheet);
+}
+
+async function buildFleetWorkbook(report, filters) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Portal Logistica";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  createFleetSummaryWorksheet(workbook, report, filters);
+  createFleetBreakdownWorksheet(workbook, "Veiculos", report.veiculos, "veiculo");
+  createFleetBreakdownWorksheet(workbook, "Motoristas", report.motoristas, "motorista");
+  createFleetExpensesWorksheet(workbook, report);
+
+  return workbook.xlsx.writeBuffer();
+}
+
 async function loadClientReport(userId, filters) {
   const report = await reportRepository.listByClient(userId, filters);
 
@@ -322,6 +470,10 @@ async function loadClientReport(userId, filters) {
     clientes: report.clientes,
     apoio: report.apoio,
   };
+}
+
+async function loadFleetCostReport(userId, filters) {
+  return reportRepository.getFleetCostReport(userId, filters);
 }
 
 async function listByClient(req, res) {
@@ -364,6 +516,40 @@ async function exportClientsXlsx(req, res) {
   res.status(200).send(Buffer.from(buffer));
 }
 
+async function exportFleetCostsCsv(req, res) {
+  const { errors, data } = validateClientReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  const report = await loadFleetCostReport(req.user, data);
+  const csv = buildFleetCostsCsv(report);
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${buildFleetExportFileName(data)}"`);
+  res.status(200).send(csv);
+}
+
+async function exportFleetCostsXlsx(req, res) {
+  const { errors, data } = validateClientReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  const report = await loadFleetCostReport(req.user, data);
+  const buffer = await buildFleetWorkbook(report, data);
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${buildFleetExportXlsxFileName(data)}"`,
+  );
+  res.status(200).send(Buffer.from(buffer));
+}
+
 async function showClientDetail(req, res) {
   if (!isValidUuid(req.params.id)) {
     throw new HttpError(400, "Identificador de cliente invalido");
@@ -377,6 +563,15 @@ async function showClientDetail(req, res) {
   res.json(detail);
 }
 
+async function getFleetCostsReport(req, res) {
+  const { errors, data } = validateClientReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  res.json(await loadFleetCostReport(req.user, data));
+}
+
 module.exports = {
   page,
   listByClient,
@@ -384,7 +579,12 @@ module.exports = {
   buildOverallSummary,
   buildRankings,
   buildClientsCsv,
+  buildFleetCostsCsv,
   buildClientsWorkbook,
+  buildFleetWorkbook,
   exportClientsCsv,
   exportClientsXlsx,
+  exportFleetCostsCsv,
+  exportFleetCostsXlsx,
+  getFleetCostsReport,
 };

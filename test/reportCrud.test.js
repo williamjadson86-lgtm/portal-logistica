@@ -18,12 +18,14 @@ const originalRepositories = {
   findById: userRepository.findById,
   listByClient: reportRepository.listByClient,
   getClientReportDetails: reportRepository.getClientReportDetails,
+  getFleetCostReport: reportRepository.getFleetCostReport,
 };
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
   reportRepository.listByClient = originalRepositories.listByClient;
   reportRepository.getClientReportDetails = originalRepositories.getClientReportDetails;
+  reportRepository.getFleetCostReport = originalRepositories.getFleetCostReport;
 }
 
 function createCookie() {
@@ -70,6 +72,76 @@ function createClientRow(overrides = {}) {
     lancamentosVencidos: 1,
     ticketMedioPorEntrega: 300.13,
     ...overrides,
+  };
+}
+
+function createFleetReport() {
+  return {
+    resumo: {
+      totalEntregasRentaveis: 8,
+      totalVeiculosComMovimento: 2,
+      totalMotoristasComMovimento: 2,
+      receitaTotal: 5400,
+      despesaTotal: 1900,
+      lucroOperacional: 3500,
+      resultadoLiquido: 3500,
+      margemOperacional: 64.81,
+      lancamentosVencidos: 1,
+      custosPorTipo: {
+        abastecimento: 900,
+        manutencao: 1000,
+      },
+    },
+    veiculos: [
+      {
+        veiculoId: "f46bde49-cf4f-4e56-8f32-bd4426cf4f93",
+        placa: "ABC1D23",
+        modelo: "Sprinter",
+        status: "disponivel",
+        totalEntregas: 5,
+        receitaTotal: 3200,
+        despesaTotal: 900,
+        lucro: 2300,
+        resultadoLiquido: 2300,
+        margem: 71.88,
+        rentabilidade: 71.88,
+      },
+    ],
+    motoristas: [
+      {
+        motoristaId: "99b8d761-3792-43c4-ab67-5520d5f11003",
+        nome: "Paulo Nunes",
+        status: "ativo",
+        totalEntregas: 5,
+        receitaTotal: 3200,
+        despesaTotal: 900,
+        lucro: 2300,
+        resultadoLiquido: 2300,
+        margem: 71.88,
+        rentabilidade: 71.88,
+      },
+    ],
+    ranking: {
+      topVeiculosLucratividade: [],
+      topMotoristasLucratividade: [],
+      maioresDespesas: [
+        {
+          id: "56f29d1a-b2f1-47a5-9533-c9d3ba34ea2a",
+          descricao: "Troca de pneus",
+          tipo: "manutencao",
+          valor: 1000,
+          status: "pago",
+          dataDespesa: "2026-06-10",
+          veiculo: {
+            placa: "ABC1D23",
+            modelo: "Sprinter",
+          },
+          motorista: {
+            nome: "Paulo Nunes",
+          },
+        },
+      ],
+    },
   };
 }
 
@@ -347,4 +419,54 @@ test("ranking ordena clientes por receita, volume e pendencias", async () => {
   assert.equal(response.body.ranking.topVolumeEntregas[0].nome, "Gamma");
   assert.equal(response.body.ranking.topValorPendente[0].nome, "Acme");
   assert.equal(response.body.ranking.clientesComLancamentosVencidos[0].nome, "Acme");
+});
+
+test("relatorio de custos da frota retorna rentabilidade operacional", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFleetCostReport = async () => createFleetReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/frota/custos?dataInicio=2026-06-01&dataFim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.resumo.receitaTotal, 5400);
+  assert.equal(response.body.resumo.resultadoLiquido, 3500);
+  assert.equal(response.body.veiculos[0].placa, "ABC1D23");
+  assert.equal(response.body.motoristas[0].rentabilidade, 71.88);
+});
+
+test("exportacao csv da frota retorna attachment e conteudo esperado", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFleetCostReport = async () => createFleetReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/frota/custos/export.csv?dataInicio=2026-06-01&dataFim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers["content-type"], /text\/csv/);
+  assert.match(response.headers["content-disposition"], /attachment/);
+  assert.match(response.text.split("\n")[0], /categoria,identificador,descricao/);
+  assert.match(response.text, /ABC1D23/);
+});
+
+test("exportacao xlsx da frota retorna arquivo nao vazio", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFleetCostReport = async () => createFleetReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/frota/custos/export.xlsx?dataInicio=2026-06-01&dataFim=2026-06-30")
+    .buffer(true)
+    .parse(binaryParser)
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers["content-type"],
+    /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
+  );
+  assert.ok(response.body.length > 0);
+  assert.equal(response.body[0], 0x50);
+  assert.equal(response.body[1], 0x4b);
 });

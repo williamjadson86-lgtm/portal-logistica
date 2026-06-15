@@ -15,10 +15,17 @@ function createReportsApp() {
   const detailBlocks = document.querySelector("[data-reports-detail-blocks]");
   const rankingMain = document.querySelector("[data-reports-ranking-main]");
   const rankingAlerts = document.querySelector("[data-reports-ranking-alerts]");
+  const fleetSummary = document.querySelector("[data-reports-fleet-summary]");
+  const fleetVehicles = document.querySelector("[data-reports-fleet-vehicles]");
+  const fleetDrivers = document.querySelector("[data-reports-fleet-drivers]");
+  const fleetTypes = document.querySelector("[data-reports-fleet-types]");
+  const fleetExpenses = document.querySelector("[data-reports-fleet-expenses]");
   const refreshButton = document.querySelector("[data-reports-refresh-button]");
   const clearFiltersButton = document.querySelector("[data-reports-clear-filters-button]");
   const exportButton = document.querySelector("[data-reports-export-button]");
   const exportExcelButton = document.querySelector("[data-reports-export-excel-button]");
+  const fleetExportButton = document.querySelector("[data-reports-fleet-export-button]");
+  const fleetExportExcelButton = document.querySelector("[data-reports-fleet-export-excel-button]");
   const clientSelect = document.querySelector("[data-reports-filter-form] [name='clienteId']");
 
   let rows = [];
@@ -166,6 +173,156 @@ function createReportsApp() {
         (item) => `${item.lancamentosVencidos} vencido(s)`,
       ),
     ].join("");
+  }
+
+  function renderFleetList(container, items, builder, emptyTitle, emptyText) {
+    if (!Array.isArray(items) || items.length === 0) {
+      container.innerHTML = `
+        <article class="data-card empty">
+          <strong>${emptyTitle}</strong>
+          <p>${emptyText}</p>
+        </article>
+      `;
+      return;
+    }
+
+    container.innerHTML = items.map(builder).join("");
+  }
+
+  function renderFleetReport(report) {
+    if (!report) {
+      fleetSummary.innerHTML = `
+        <article class="stat-card compact">
+          <span>Receita operacional</span>
+          <strong>R$ 0,00</strong>
+        </article>
+      `;
+      renderFleetList(
+        fleetVehicles,
+        [],
+        () => "",
+        "Sem dados de frota",
+        "Os veiculos com movimento aparecerao aqui.",
+      );
+      renderFleetList(
+        fleetDrivers,
+        [],
+        () => "",
+        "Sem dados de motoristas",
+        "As associacoes de custo e receita aparecerao aqui.",
+      );
+      renderFleetList(
+        fleetTypes,
+        [],
+        () => "",
+        "Nenhum custo consolidado",
+        "Cadastre despesas de frota para visualizar a composicao por tipo.",
+      );
+      renderFleetList(
+        fleetExpenses,
+        [],
+        () => "",
+        "Nenhuma despesa carregada",
+        "Os maiores custos do periodo aparecerao aqui.",
+      );
+      return;
+    }
+
+    const summaryCards = [
+      { rotulo: "Receita operacional", valor: formatCurrency(report.resumo.receitaTotal) },
+      { rotulo: "Despesa da frota", valor: formatCurrency(report.resumo.despesaTotal) },
+      { rotulo: "Lucro operacional", valor: formatCurrency(report.resumo.lucroOperacional) },
+      { rotulo: "Resultado liquido", valor: formatCurrency(report.resumo.resultadoLiquido) },
+      { rotulo: "Margem operacional", valor: `${report.resumo.margemOperacional}%` },
+      { rotulo: "Veiculos com movimento", valor: report.resumo.totalVeiculosComMovimento },
+      { rotulo: "Motoristas com movimento", valor: report.resumo.totalMotoristasComMovimento },
+      { rotulo: "Lancamentos vencidos", valor: report.resumo.lancamentosVencidos },
+    ];
+
+    fleetSummary.innerHTML = summaryCards
+      .map(
+        (item) => `
+          <article class="stat-card compact">
+            <span>${item.rotulo}</span>
+            <strong>${item.valor}</strong>
+          </article>
+        `,
+      )
+      .join("");
+
+    renderFleetList(
+      fleetVehicles,
+      report.ranking.topVeiculosLucratividade,
+      (item) => `
+        <article class="data-card">
+          <div class="data-card-top">
+            <div>
+              <h3>${item.placa}</h3>
+              <p>${item.modelo}</p>
+            </div>
+            <span class="status-tag">${item.totalEntregas} entregas</span>
+          </div>
+          <strong>${formatCurrency(item.lucro)}</strong>
+          <p>Receita ${formatCurrency(item.receitaTotal)} | Custo ${formatCurrency(item.despesaTotal)} | Margem ${item.margem}%</p>
+        </article>
+      `,
+      "Sem dados de frota",
+      "Os veiculos com movimento aparecerao aqui.",
+    );
+
+    renderFleetList(
+      fleetDrivers,
+      report.ranking.topMotoristasLucratividade,
+      (item) => `
+        <article class="data-card">
+          <div class="data-card-top">
+            <div>
+              <h3>${item.nome}</h3>
+              <p>${createStatusLabel(item.status)}</p>
+            </div>
+            <span class="status-tag">${item.totalEntregas} entregas</span>
+          </div>
+          <strong>${formatCurrency(item.lucro)}</strong>
+          <p>Receita ${formatCurrency(item.receitaTotal)} | Custo ${formatCurrency(item.despesaTotal)} | Margem ${item.margem}%</p>
+        </article>
+      `,
+      "Sem dados de motoristas",
+      "As associacoes de custo e receita aparecerao aqui.",
+    );
+
+    renderFleetList(
+      fleetTypes,
+      Object.entries(report.resumo.custosPorTipo || {}),
+      ([tipo, valor]) => `
+        <article class="data-card">
+          <h3>${createStatusLabel(tipo)}</h3>
+          <strong>${formatCurrency(valor)}</strong>
+          <p>Participacao consolidada no periodo filtrado.</p>
+        </article>
+      `,
+      "Nenhum custo consolidado",
+      "Cadastre despesas de frota para visualizar a composicao por tipo.",
+    );
+
+    renderFleetList(
+      fleetExpenses,
+      report.ranking.maioresDespesas,
+      (item) => `
+        <article class="data-card">
+          <div class="data-card-top">
+            <div>
+              <h3>${item.descricao}</h3>
+              <p>${item.veiculo ? `${item.veiculo.placa} - ${item.veiculo.modelo}` : "Veiculo nao informado"}</p>
+            </div>
+            <span class="status-tag">${createStatusLabel(item.tipo)}</span>
+          </div>
+          <strong>${formatCurrency(item.valor)}</strong>
+          <p>${item.dataDespesa || "-"} | ${createStatusLabel(item.status)}</p>
+        </article>
+      `,
+      "Nenhuma despesa carregada",
+      "Os maiores custos do periodo aparecerao aqui.",
+    );
   }
 
   function renderDetail(detail) {
@@ -346,13 +503,17 @@ function createReportsApp() {
     setMessage(message, "", "");
 
     try {
-      const response = await requestJson(`/api/relatorios/clientes${query ? `?${query}` : ""}`);
+      const [response, fleetReport] = await Promise.all([
+        requestJson(`/api/relatorios/clientes${query ? `?${query}` : ""}`),
+        requestJson(`/api/relatorios/frota/custos${query ? `?${query}` : ""}`),
+      ]);
       rows = response.clientes;
       availableClients = response.apoio.clientes || [];
       renderClientOptions();
       clientSelect.value = filters.clienteId || "";
       renderSummaryCards(response.resumo);
       renderRankings(response.ranking);
+      renderFleetReport(fleetReport);
       renderTable();
 
       if (selectedClientId) {
@@ -416,10 +577,21 @@ function createReportsApp() {
     const query = buildQueryString(filters);
     window.location.href = `/api/relatorios/clientes/export.xlsx${query ? `?${query}` : ""}`;
   });
+  fleetExportButton.addEventListener("click", () => {
+    const filters = serializeForm(filterForm);
+    const query = buildQueryString(filters);
+    window.location.href = `/api/relatorios/frota/custos/export.csv${query ? `?${query}` : ""}`;
+  });
+  fleetExportExcelButton.addEventListener("click", () => {
+    const filters = serializeForm(filterForm);
+    const query = buildQueryString(filters);
+    window.location.href = `/api/relatorios/frota/custos/export.xlsx${query ? `?${query}` : ""}`;
+  });
 
   setDefaultRange();
   renderDetail(null);
   renderRankings(null);
+  renderFleetReport(null);
   refreshList().catch(handlePageError);
 }
 

@@ -1,6 +1,7 @@
 const deliveryRepository = require("./deliveryRepository");
 const routePlanningRepository = require("./routePlanningRepository");
 const driverRepository = require("./driverRepository");
+const fleetCostRepository = require("./fleetCostRepository");
 const vehicleRepository = require("./vehicleRepository");
 const financeRepository = require("./financeRepository");
 const proofRepository = require("./proofRepository");
@@ -14,7 +15,7 @@ function isWithinRange(value, start, end) {
 }
 
 async function getOperationalDashboard(actor, filter) {
-  const [deliveries, routes, drivers, vehicles, financialEntries, proofs] = await Promise.all([
+  const [deliveries, routes, drivers, vehicles, financialEntries, proofs, vehicleExpenses] = await Promise.all([
     deliveryRepository.listForUser(actor),
     routePlanningRepository.listForUser(actor),
     driverRepository.listByUserId(actor),
@@ -24,6 +25,10 @@ async function getOperationalDashboard(actor, filter) {
       dataFim: filter.dataFim,
     }),
     proofRepository.listByUserId(actor, { ativo: true }),
+    fleetCostRepository.listByUserId(actor, {
+      dataInicio: filter.dataInicio,
+      dataFim: filter.dataFim,
+    }),
   ]);
 
   const deliveriesInPeriod = deliveries.filter((delivery) =>
@@ -93,6 +98,22 @@ async function getOperationalDashboard(actor, filter) {
       entry.dataVencimento &&
       entry.dataVencimento < filter.hoje,
   ).length;
+  const totalDespesasFrotaPeriodo = Number(
+    vehicleExpenses.reduce((sum, entry) => sum + entry.valor, 0).toFixed(2),
+  );
+  const despesasFrotaVencidas = vehicleExpenses.filter(
+    (entry) =>
+      ["pendente", "faturado"].includes(entry.status) &&
+      entry.dataVencimento &&
+      entry.dataVencimento < filter.hoje,
+  ).length;
+  const lucroOperacionalPeriodo = Number(
+    (receitaTotalPeriodo - totalDespesasFrotaPeriodo).toFixed(2),
+  );
+  const margemOperacionalPeriodo =
+    receitaTotalPeriodo === 0
+      ? 0
+      : Number(((lucroOperacionalPeriodo / receitaTotalPeriodo) * 100).toFixed(2));
 
   return {
     filtro: {
@@ -114,6 +135,10 @@ async function getOperationalDashboard(actor, filter) {
       veiculosEmRota: vehicles.filter((vehicle) => vehicle.status === "em_rota").length,
       veiculosEmManutencao: vehicles.filter((vehicle) => vehicle.status === "manutencao").length,
       receitaTotalPeriodo,
+      totalDespesasFrotaPeriodo,
+      lucroOperacionalPeriodo,
+      resultadoLiquidoPeriodo: lucroOperacionalPeriodo,
+      margemOperacionalPeriodo,
       valoresPendentes,
       valoresPagos,
       lancamentosVencidos,
@@ -137,6 +162,7 @@ async function getOperationalDashboard(actor, filter) {
       ).length,
       rotasEmAndamento: routes.filter((route) => route.status === "em_andamento").length,
       lancamentosVencidos,
+      despesasFrotaVencidas,
     },
     produtividade: {
       entregasConcluidasPeriodo,
@@ -150,9 +176,14 @@ async function getOperationalDashboard(actor, filter) {
       totalComprovantesPeriodo: proofsInPeriod.length,
       entregasEntreguesSemComprovante: deliveredWithoutProof.length,
       receitaTotalPeriodo,
+      totalDespesasFrotaPeriodo,
+      lucroOperacionalPeriodo,
+      resultadoLiquidoPeriodo: lucroOperacionalPeriodo,
+      margemOperacionalPeriodo,
       valoresPendentes,
       valoresPagos,
       lancamentosVencidos,
+      despesasFrotaVencidas,
     },
   };
 }

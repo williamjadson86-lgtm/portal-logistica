@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS empresas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nome VARCHAR(160) NOT NULL,
+  nome VARCHAR(150) NOT NULL,
   documento VARCHAR(18),
   email VARCHAR(255),
   telefone VARCHAR(20),
@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS empresas (
   criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_empresas_nome ON empresas (nome);
 CREATE INDEX IF NOT EXISTS idx_empresas_documento ON empresas (documento);
 CREATE INDEX IF NOT EXISTS idx_empresas_ativo ON empresas (ativo);
@@ -157,32 +156,59 @@ WHERE r.empresa_id IS NULL
   AND u.empresa_id IS NOT NULL;
 
 UPDATE rota_entregas re
-SET empresa_id = COALESCE(r.empresa_id, e.empresa_id, u.empresa_id)
-FROM rotas_operacionais r
-LEFT JOIN entregas e
-  ON e.id = re.entrega_id
-LEFT JOIN usuarios u
-  ON u.id = re.usuario_id
-WHERE re.empresa_id IS NULL
-  AND r.id = re.rota_id;
+SET empresa_id = origem.empresa_id
+FROM (
+  SELECT
+    re_base.id,
+    COALESCE(r.empresa_id, e.empresa_id, u.empresa_id) AS empresa_id
+  FROM rota_entregas re_base
+  LEFT JOIN rotas_operacionais r
+    ON r.id = re_base.rota_id
+  LEFT JOIN entregas e
+    ON e.id = re_base.entrega_id
+  LEFT JOIN usuarios u
+    ON u.id = re_base.usuario_id
+  WHERE re_base.empresa_id IS NULL
+) AS origem
+WHERE re.id = origem.id
+  AND re.empresa_id IS NULL
+  AND origem.empresa_id IS NOT NULL;
 
 UPDATE comprovantes c
-SET empresa_id = COALESCE(e.empresa_id, u.empresa_id)
-FROM entregas e
-LEFT JOIN usuarios u
-  ON u.id = c.usuario_id
-WHERE c.empresa_id IS NULL
-  AND e.id = c.entrega_id;
+SET empresa_id = origem.empresa_id
+FROM (
+  SELECT
+    c_base.id,
+    COALESCE(e.empresa_id, u.empresa_id) AS empresa_id
+  FROM comprovantes c_base
+  LEFT JOIN entregas e
+    ON e.id = c_base.entrega_id
+  LEFT JOIN usuarios u
+    ON u.id = c_base.usuario_id
+  WHERE c_base.empresa_id IS NULL
+) AS origem
+WHERE c.id = origem.id
+  AND c.empresa_id IS NULL
+  AND origem.empresa_id IS NOT NULL;
 
 UPDATE lancamentos_financeiros lf
-SET empresa_id = COALESCE(c.empresa_id, e.empresa_id, u.empresa_id)
-FROM usuarios u
-LEFT JOIN clientes c
-  ON c.id = lf.cliente_id
-LEFT JOIN entregas e
-  ON e.id = lf.entrega_id
-WHERE lf.empresa_id IS NULL
-  AND u.id = lf.usuario_id;
+SET empresa_id = origem.empresa_id
+FROM (
+  SELECT
+    lf_base.id,
+    COALESCE(c.empresa_id, e.empresa_id, u.empresa_id) AS empresa_id
+  FROM lancamentos_financeiros lf_base
+  LEFT JOIN usuarios u
+    ON u.id = lf_base.usuario_id
+  LEFT JOIN clientes c
+    ON c.id = lf_base.cliente_id
+  LEFT JOIN entregas e
+    ON e.id = lf_base.entrega_id
+  WHERE lf_base.empresa_id IS NULL
+) AS origem
+WHERE lf.id = origem.id
+  AND lf.empresa_id IS NULL
+  AND origem.empresa_id IS NOT NULL;
 
 UPDATE documentos d
 SET empresa_id = u.empresa_id
@@ -206,9 +232,18 @@ WHERE cu.empresa_id IS NULL
   AND u.empresa_id IS NOT NULL;
 
 UPDATE entrega_eventos ee
-SET empresa_id = COALESCE(e.empresa_id, u.empresa_id)
-FROM entregas e
-LEFT JOIN usuarios u
-  ON u.id = ee.usuario_id
-WHERE ee.empresa_id IS NULL
-  AND e.id = ee.entrega_id;
+SET empresa_id = origem.empresa_id
+FROM (
+  SELECT
+    ee_base.id,
+    COALESCE(e.empresa_id, u.empresa_id) AS empresa_id
+  FROM entrega_eventos ee_base
+  LEFT JOIN entregas e
+    ON e.id = ee_base.entrega_id
+  LEFT JOIN usuarios u
+    ON u.id = ee_base.usuario_id
+  WHERE ee_base.empresa_id IS NULL
+) AS origem
+WHERE ee.id = origem.id
+  AND ee.empresa_id IS NULL
+  AND origem.empresa_id IS NOT NULL;

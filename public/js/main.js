@@ -126,6 +126,9 @@ function renderDashboardMetrics(data) {
     { rotulo: "Veiculos em rota", valor: data.metricas.veiculosEmRota },
     { rotulo: "Veiculos em manutencao", valor: data.metricas.veiculosEmManutencao },
     { rotulo: "Receita do periodo", valor: formatCurrency(data.metricas.receitaTotalPeriodo) },
+    { rotulo: "Despesas da frota", valor: formatCurrency(data.metricas.totalDespesasFrotaPeriodo) },
+    { rotulo: "Lucro operacional", valor: formatCurrency(data.metricas.lucroOperacionalPeriodo) },
+    { rotulo: "Margem operacional", valor: `${data.metricas.margemOperacionalPeriodo}%` },
     { rotulo: "Valores pendentes", valor: formatCurrency(data.metricas.valoresPendentes) },
     { rotulo: "Valores pagos", valor: formatCurrency(data.metricas.valoresPagos) },
     { rotulo: "Lancamentos vencidos", valor: data.metricas.lancamentosVencidos },
@@ -189,6 +192,11 @@ function renderDashboardAlerts(data) {
       titulo: "Lancamentos vencidos",
       valor: data.alertas.lancamentosVencidos,
       descricao: "Titulos pendentes ou faturados ja vencidos.",
+    },
+    {
+      titulo: "Despesas da frota vencidas",
+      valor: data.alertas.despesasFrotaVencidas,
+      descricao: "Custos operacionais aguardando quitacao.",
     },
   ];
 
@@ -257,6 +265,21 @@ function renderDashboardProductivity(data) {
       descricao: "Receita operacional consolidada na janela filtrada.",
     },
     {
+      titulo: "Despesas totais da frota",
+      valor: formatCurrency(data.produtividade.totalDespesasFrotaPeriodo),
+      descricao: "Custos de abastecimento, pedagio e manutencao do periodo.",
+    },
+    {
+      titulo: "Lucro operacional",
+      valor: formatCurrency(data.produtividade.lucroOperacionalPeriodo),
+      descricao: "Resultado entre receita operacional e custos da frota.",
+    },
+    {
+      titulo: "Margem operacional",
+      valor: `${data.produtividade.margemOperacionalPeriodo}%`,
+      descricao: "Percentual de margem sobre a receita operacional do periodo.",
+    },
+    {
       titulo: "Valores pendentes",
       valor: formatCurrency(data.produtividade.valoresPendentes),
       descricao: "Volume financeiro aguardando faturamento ou pagamento.",
@@ -270,6 +293,11 @@ function renderDashboardProductivity(data) {
       titulo: "Lancamentos vencidos",
       valor: data.produtividade.lancamentosVencidos,
       descricao: "Pendencias financeiras fora do prazo de vencimento.",
+    },
+    {
+      titulo: "Despesas vencidas",
+      valor: data.produtividade.despesasFrotaVencidas,
+      descricao: "Custos da frota em atraso que merecem acao imediata.",
     },
   ];
 
