@@ -1,35 +1,50 @@
 const repository = require("../repositories/settingsRepository");
+const userRepository = require("../repositories/userRepository");
 const resolveView = require("../utils/viewResolver");
+const HttpError = require("../errors/HttpError");
+const { validateSettingsUpdate } = require("../validations/settingsValidation");
 
 function page(_req, res) {
   res.sendFile(resolveView("configuracoes.html"));
 }
 
 async function data(req, res) {
-  const settings = await repository.findByUserId(req.user);
+  const [settings, users, permissions] = await Promise.all([
+    repository.findByUserId(req.user),
+    userRepository.listByActor(req.user),
+    repository.listPermissions(),
+  ]);
 
   res.json({
     usuario: req.user,
-    modulo: {
-      titulo: "Configuracoes",
-      descricao: "Preferencias pessoais e configuracoes de notificacao do portal.",
-    },
-    resumo: [
-      { rotulo: "Tema", valor: settings.tema },
-      { rotulo: "Idioma", valor: settings.idioma },
-      { rotulo: "E-mail", valor: settings.notificacoesEmail ? "Ativo" : "Desativado" },
-      { rotulo: "Push", valor: settings.notificacoesPush ? "Ativo" : "Desativado" },
-    ],
-    itens: [
-      {
-        titulo: "Preferencias do portal",
-        subtitulo: "Configuracao base do usuario autenticado",
-        status: "ativo",
-        meta: `Atualizado em ${new Date(settings.atualizadoEm).toLocaleDateString("pt-BR")}`,
-        descricao: `Tema ${settings.tema}, idioma ${settings.idioma}, e-mail ${settings.notificacoesEmail ? "ligado" : "desligado"} e push ${settings.notificacoesPush ? "ligado" : "desligado"}.`,
-      },
-    ],
+    empresa: settings.empresa,
+    configuracoes: settings.configuracoes,
+    usuarios: users,
+    resumoUsuarios: settings.resumoUsuarios,
+    permissoes: permissions,
   });
 }
 
-module.exports = { page, data };
+async function update(req, res) {
+  const { errors, data } = validateSettingsUpdate(req.body);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Dados invalidos", errors);
+  }
+
+  const settings = await repository.updateByUserId(req.user, data);
+  res.json({
+    mensagem: "Configuracoes atualizadas com sucesso",
+    configuracoes: settings.configuracoes,
+  });
+}
+
+async function permissions(req, res) {
+  res.json(repository.listPermissions());
+}
+
+module.exports = {
+  page,
+  data,
+  update,
+  permissions,
+};

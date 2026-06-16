@@ -22,6 +22,8 @@ const documentRoutes = require("./routes/documentRoutes");
 const supportRoutes = require("./routes/supportRoutes");
 const noticeRoutes = require("./routes/noticeRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const companyRoutes = require("./routes/companyRoutes");
+const userManagementRoutes = require("./routes/userManagementRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 const HttpError = require("./errors/HttpError");
 
@@ -56,6 +58,8 @@ app.use("/", documentRoutes);
 app.use("/", supportRoutes);
 app.use("/", noticeRoutes);
 app.use("/", settingsRoutes);
+app.use("/", companyRoutes);
+app.use("/", userManagementRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 

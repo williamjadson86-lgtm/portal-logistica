@@ -191,3 +191,20 @@ test("migration 011 cria empresas e adiciona colunas de tenancy", () => {
   assert.match(sql, /ALTER TABLE entregas\s+ADD COLUMN IF NOT EXISTS empresa_id/);
   assert.match(sql, /UPDATE usuarios u\s+SET empresa_id/);
 });
+
+test("migration 015 expande empresas, configuracoes e perfis", () => {
+  const migrationPath = path.join(
+    __dirname,
+    "..",
+    "database",
+    "migrations",
+    "015_expand_empresas_settings_and_users.sql",
+  );
+  const sql = fs.readFileSync(migrationPath, "utf8");
+
+  assert.match(sql, /ALTER TABLE empresas/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS razao_social/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS configuracoes_empresa/);
+  assert.match(sql, /dashboard_periodo_padrao/);
+  assert.match(sql, /'gestor'/);
+});

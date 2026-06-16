@@ -7,26 +7,244 @@
     <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
-    <main class="portal-shell module-page" data-module-page data-api-endpoint="/api/configuracoes">
+    <main class="portal-shell">
       <section class="page-card">
         <header class="portal-header">
           <div>
-            <span class="status-pill">Modulo ativo</span>
-            <h1 data-module-title>Configuracoes</h1>
-            <p data-module-description>Preferencias do usuario.</p>
+            <span class="status-pill">Administracao</span>
+            <h1>Configuracoes da empresa</h1>
+            <p>Gerencie dados da empresa, usuarios, perfis e preferencias do sistema.</p>
           </div>
           <div class="header-actions">
             <a class="button ghost" href="/home">Voltar para home</a>
             <button class="button ghost" type="button" data-logout-button>Sair</button>
           </div>
         </header>
-        <section class="module-summary-grid" data-module-summary></section>
+
+        <div class="message" data-settings-message></div>
+        <div class="dashboard-loading" data-settings-loading hidden>Carregando configuracoes...</div>
+
+        <section class="module-summary-grid" data-settings-summary></section>
+
+        <section class="dashboard-two-columns">
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Empresa</span>
+                <h2>Dados cadastrais</h2>
+              </div>
+            </div>
+            <form class="grid-form two-columns" data-company-form>
+              <input type="hidden" name="id" />
+              <div class="field">
+                <label for="companyRazaoSocial">Razao social</label>
+                <input id="companyRazaoSocial" name="razaoSocial" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyNomeFantasia">Nome fantasia</label>
+                <input id="companyNomeFantasia" name="nomeFantasia" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyCnpj">CNPJ</label>
+                <input id="companyCnpj" name="cnpj" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyEmail">E-mail</label>
+                <input id="companyEmail" name="email" type="email" />
+              </div>
+              <div class="field">
+                <label for="companyTelefone">Telefone</label>
+                <input id="companyTelefone" name="telefone" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyStatus">Status</label>
+                <select id="companyStatus" name="status">
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="companyEndereco">Endereco</label>
+                <input id="companyEndereco" name="endereco" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyCidade">Cidade</label>
+                <input id="companyCidade" name="cidade" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyEstado">Estado</label>
+                <input id="companyEstado" name="estado" type="text" maxlength="2" />
+              </div>
+              <div class="field">
+                <label for="companyCep">CEP</label>
+                <input id="companyCep" name="cep" type="text" />
+              </div>
+              <div class="field">
+                <label for="companyLogoUrl">Logo URL</label>
+                <input id="companyLogoUrl" name="logoUrl" type="url" />
+              </div>
+              <div class="actions field full">
+                <button class="button primary" type="submit">Salvar empresa</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Sistema</span>
+                <h2>Preferencias globais</h2>
+              </div>
+            </div>
+            <form class="grid-form" data-platform-settings-form>
+              <div class="field">
+                <label for="settingsTimezone">Timezone</label>
+                <select id="settingsTimezone" name="timezone">
+                  <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+                  <option value="UTC">UTC</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="settingsMoeda">Moeda</label>
+                <select id="settingsMoeda" name="moeda">
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="settingsFormatoData">Formato de data</label>
+                <select id="settingsFormatoData" name="formatoData">
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="settingsDashboardPeriodoPadrao">Periodo padrao do dashboard</label>
+                <select id="settingsDashboardPeriodoPadrao" name="dashboardPeriodoPadrao">
+                  <option value="hoje">Hoje</option>
+                  <option value="7d">Ultimos 7 dias</option>
+                  <option value="30d">Ultimos 30 dias</option>
+                  <option value="custom">Personalizado</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="settingsDashboardExibirFinanceiro">Indicadores financeiros no dashboard</label>
+                <select id="settingsDashboardExibirFinanceiro" name="dashboardExibirFinanceiro">
+                  <option value="true">Exibir</option>
+                  <option value="false">Ocultar</option>
+                </select>
+              </div>
+              <div class="actions field full">
+                <button class="button primary" type="submit">Salvar configuracoes</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
         <section class="module-panel">
-          <h2>Preferencias atuais</h2>
-          <div class="module-list" data-module-items></div>
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Usuarios</span>
+              <h2>Gestao de usuarios da empresa</h2>
+            </div>
+          </div>
+
+          <form class="grid-form two-columns" data-user-form>
+            <input type="hidden" name="id" />
+            <div class="field">
+              <label for="userNome">Nome</label>
+              <input id="userNome" name="nome" type="text" />
+            </div>
+            <div class="field">
+              <label for="userEmail">E-mail</label>
+              <input id="userEmail" name="email" type="email" />
+            </div>
+            <div class="field">
+              <label for="userDocumento">Documento</label>
+              <input id="userDocumento" name="documento" type="text" />
+            </div>
+            <div class="field">
+              <label for="userTelefone">Telefone</label>
+              <input id="userTelefone" name="telefone" type="text" />
+            </div>
+            <div class="field">
+              <label for="userMatricula">Matricula</label>
+              <input id="userMatricula" name="matricula" type="text" />
+            </div>
+            <div class="field">
+              <label for="userPerfil">Perfil</label>
+              <select id="userPerfil" name="perfil">
+                <option value="administrador">Administrador</option>
+                <option value="gestor">Gestor</option>
+                <option value="operador">Operador</option>
+                <option value="financeiro">Financeiro</option>
+                <option value="motorista">Motorista</option>
+                <option value="colaborador">Colaborador</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="userStatus">Status</label>
+              <select id="userStatus" name="status">
+                <option value="ativo">Ativo</option>
+                <option value="bloqueado">Bloqueado</option>
+                <option value="inativo">Inativo</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="userSenha">Senha</label>
+              <input id="userSenha" name="senha" type="password" />
+            </div>
+            <div class="actions field full">
+              <button class="button primary" type="submit">Salvar usuario</button>
+              <button class="button ghost" type="button" data-user-form-reset>Limpar</button>
+            </div>
+          </form>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>E-mail</th>
+                  <th>Perfil</th>
+                  <th>Status</th>
+                  <th>Matricula</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-users-table-body>
+                <tr><td colspan="6">Carregando usuarios...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="dashboard-two-columns">
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Permissoes</span>
+                <h2>Perfis e modulos liberados</h2>
+              </div>
+            </div>
+            <div class="module-list" data-permissions-list></div>
+          </article>
+
+          <article class="module-panel">
+            <div class="section-heading">
+              <div>
+                <span class="status-pill subtle">Sistema</span>
+                <h2>Permissoes catalogadas</h2>
+              </div>
+            </div>
+            <div class="module-list" data-permissions-catalog></div>
+          </article>
         </section>
       </section>
     </main>
+
     <script src="/public/js/main.js"></script>
+    <script src="/public/js/settings.js"></script>
   </body>
 </html>

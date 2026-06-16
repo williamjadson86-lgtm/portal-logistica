@@ -140,6 +140,10 @@ function renderDashboardMetrics(data) {
     { rotulo: "Valores pendentes", valor: formatCurrency(data.metricas.valoresPendentes) },
     { rotulo: "Valores pagos", valor: formatCurrency(data.metricas.valoresPagos) },
     { rotulo: "Lancamentos vencidos", valor: data.metricas.lancamentosVencidos },
+    { rotulo: "Usuarios totais", valor: data.metricas.totalUsuarios || 0 },
+    { rotulo: "Usuarios ativos", valor: data.metricas.usuariosAtivos || 0 },
+    { rotulo: "Usuarios bloqueados", valor: data.metricas.usuariosBloqueados || 0 },
+    { rotulo: "Empresa ativa", valor: data.metricas.empresaAtiva ? "Sim" : "Nao" },
   ];
 
   grid.innerHTML = stats

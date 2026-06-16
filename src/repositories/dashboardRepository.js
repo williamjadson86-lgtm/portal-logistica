@@ -6,6 +6,8 @@ const vehicleMaintenanceRepository = require("./vehicleMaintenanceRepository");
 const vehicleRepository = require("./vehicleRepository");
 const financeRepository = require("./financeRepository");
 const proofRepository = require("./proofRepository");
+const userRepository = require("./userRepository");
+const companyRepository = require("./companyRepository");
 
 function isWithinRange(value, start, end) {
   if (!value) {
@@ -16,7 +18,7 @@ function isWithinRange(value, start, end) {
 }
 
 async function getOperationalDashboard(actor, filter) {
-  const [deliveries, routes, drivers, vehicles, financialEntries, proofs, vehicleExpenses, maintenances] = await Promise.all([
+  const [deliveries, routes, drivers, vehicles, financialEntries, proofs, vehicleExpenses, maintenances, userSummary, companyList] = await Promise.all([
     deliveryRepository.listForUser(actor),
     routePlanningRepository.listForUser(actor),
     driverRepository.listByUserId(actor),
@@ -34,6 +36,8 @@ async function getOperationalDashboard(actor, filter) {
       dataInicio: filter.dataInicio,
       dataFim: filter.dataFim,
     }),
+    userRepository.getCompanyUserSummary(actor),
+    companyRepository.listByActor(actor),
   ]);
 
   const deliveriesInPeriod = deliveries.filter((delivery) =>
@@ -237,6 +241,10 @@ async function getOperationalDashboard(actor, filter) {
       valoresPendentes,
       valoresPagos,
       lancamentosVencidos,
+      totalUsuarios: Number(userSummary.total || 0),
+      usuariosAtivos: Number(userSummary.ativos || 0),
+      usuariosBloqueados: Number(userSummary.bloqueados || 0),
+      empresaAtiva: companyList[0]?.status === "ativo" ? 1 : 0,
     },
     alertas: {
       entregasPendentesVencidas: deliveries.filter(

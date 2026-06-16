@@ -23,11 +23,14 @@ const app = require("../src/app");
 
 const originalRepositories = {
   findById: userRepository.findById,
+  listUsersForActor: userRepository.listByActor,
   getDashboardSummaryForUser: deliveryRepository.getDashboardSummaryForUser,
   getRouteDashboardSummaryForUser: routePlanningRepository.getDashboardSummaryForUser,
   getRouteSupportDataForUser: routePlanningRepository.getSupportDataForUser,
   listActive: noticeRepository.listActive,
   findSettings: settingsRepository.findByUserId,
+  updateSettings: settingsRepository.updateByUserId,
+  listPermissionMatrix: settingsRepository.listPermissions,
   findProfile: profileRepository.findByUserId,
   listRoutesForUser: routePlanningRepository.listForUser,
   listProofsForUser: proofRepository.listForUser,
@@ -67,6 +70,7 @@ const modulePages = [
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
+  userRepository.listByActor = originalRepositories.listUsersForActor;
   deliveryRepository.getDashboardSummaryForUser =
     originalRepositories.getDashboardSummaryForUser;
   routePlanningRepository.getDashboardSummaryForUser =
@@ -75,6 +79,8 @@ function restoreRepositories() {
     originalRepositories.getRouteSupportDataForUser;
   noticeRepository.listActive = originalRepositories.listActive;
   settingsRepository.findByUserId = originalRepositories.findSettings;
+  settingsRepository.updateByUserId = originalRepositories.updateSettings;
+  settingsRepository.listPermissions = originalRepositories.listPermissionMatrix;
   profileRepository.findByUserId = originalRepositories.findProfile;
   routePlanningRepository.listForUser = originalRepositories.listRoutesForUser;
   proofRepository.listForUser = originalRepositories.listProofsForUser;
@@ -325,12 +331,58 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
     },
   ];
   settingsRepository.findByUserId = async () => ({
-    tema: "claro",
-    idioma: "pt-BR",
-    notificacoesEmail: true,
-    notificacoesPush: true,
-    atualizadoEm: new Date().toISOString(),
+    empresa: {
+      id: "empresa-001",
+      razaoSocial: "Portal Logistica LTDA",
+      nomeFantasia: "Portal Logistica",
+      cnpj: "12.345.678/0001-90",
+      email: "contato@portal.com",
+      telefone: "(11) 90000-0000",
+      endereco: "Av. Central, 100",
+      cidade: "Sao Paulo",
+      estado: "SP",
+      cep: "01000-000",
+      logoUrl: "",
+      status: "ativo",
+    },
+    configuracoes: {
+      timezone: "America/Sao_Paulo",
+      moeda: "BRL",
+      formatoData: "DD/MM/YYYY",
+      dashboardPeriodoPadrao: "7d",
+      dashboardExibirFinanceiro: true,
+      atualizadoEm: new Date().toISOString(),
+    },
+    resumoUsuarios: {
+      total: 4,
+      ativos: 3,
+      bloqueados: 1,
+    },
   });
+  settingsRepository.listPermissions = async () => ({
+    perfis: [
+      {
+        perfil: "administrador",
+        modulosLiberados: ["/configuracoes", "/relatorios"],
+        permissoesEfetivas: ["settings:view"],
+        restricoes: [],
+      },
+    ],
+    permissoes: ["settings:view", "users:manage"],
+  });
+  userRepository.listByActor = async () => [
+    {
+      id: "usuario-001",
+      nome: "Administrador",
+      email: "admin@portal.com",
+      documento: "529.982.247-25",
+      telefone: "(11) 99999-9999",
+      matricula: "ADM0001",
+      perfil: "administrador",
+      ativo: true,
+      status: "ativo",
+    },
+  ];
   driverRepository.listByUserId = async () => [
     {
       id: "7455781a-497c-4803-bb63-5ae51fb920ea",
@@ -440,7 +492,9 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
   assert.equal(apiResponses[5].body.manutencoes[0].descricao, "Revisao preventiva");
   assert.equal(apiResponses[8].body.clientes[0].nome, "Acme Logistica");
   assert.equal(apiResponses[9].body.itens.length, 1);
-  assert.equal(apiResponses[10].body.resumo[0].valor, "claro");
+  assert.equal(apiResponses[10].body.empresa.razaoSocial, "Portal Logistica LTDA");
+  assert.equal(apiResponses[10].body.configuracoes.moeda, "BRL");
+  assert.equal(apiResponses[10].body.usuarios[0].matricula, "ADM0001");
   assert.equal(apiResponses[11].body.motoristas[0].nome, "Marcio Lima");
   assert.equal(apiResponses[12].body.veiculos[0].placa, "ABC1D23");
 });
