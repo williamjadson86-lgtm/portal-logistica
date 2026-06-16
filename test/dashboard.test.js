@@ -62,6 +62,8 @@ function createDashboardPayload(filter = { periodo: "7d", dataInicio: "2026-06-0
       manutencoesProgramadas: 4,
       receitaTotalPeriodo: 8900.5,
       totalDespesasFrotaPeriodo: 2400.25,
+      despesasPendentesFrotaPeriodo: 1700.1,
+      despesasPagasFrotaPeriodo: 700.15,
       custoManutencaoPeriodo: 700.35,
       lucroOperacionalPeriodo: 6500.25,
       resultadoLiquidoPeriodo: 6500.25,
@@ -93,6 +95,8 @@ function createDashboardPayload(filter = { periodo: "7d", dataInicio: "2026-06-0
       manutencoesConcluidasPeriodo: 2,
       receitaTotalPeriodo: 8900.5,
       totalDespesasFrotaPeriodo: 2400.25,
+      despesasPendentesFrotaPeriodo: 1700.1,
+      despesasPagasFrotaPeriodo: 700.15,
       custoManutencaoPeriodo: 700.35,
       lucroOperacionalPeriodo: 6500.25,
       resultadoLiquidoPeriodo: 6500.25,
@@ -104,9 +108,18 @@ function createDashboardPayload(filter = { periodo: "7d", dataInicio: "2026-06-0
     },
     frota: {
       custoTotalFrotaPeriodo: 2400.25,
+      despesasPendentesFrotaPeriodo: 1700.1,
+      despesasPagasFrotaPeriodo: 700.15,
       custoManutencaoPeriodo: 700.35,
       custoMedioPorVeiculo: 800.08,
       custoMedioPorMotorista: 1200.13,
+      despesasPorVeiculo: [
+        { veiculoId: "v1", placa: "ABC1D23", modelo: "Sprinter", custoTotal: 1200.1 },
+      ],
+      despesasPorTipo: [
+        { tipo: "abastecimento", valor: 1200.1 },
+        { tipo: "manutencao", valor: 700.35 },
+      ],
       veiculosMaiorDespesa: [
         { veiculoId: "v1", placa: "ABC1D23", modelo: "Sprinter", custoTotal: 1200.1 },
       ],
@@ -149,8 +162,11 @@ test("dashboard retorna metricas e alertas autenticado", async () => {
   assert.equal(response.body.produtividade.totalComprovantesPeriodo, 5);
   assert.equal(response.body.metricas.receitaTotalPeriodo, 8900.5);
   assert.equal(response.body.metricas.custoManutencaoPeriodo, 700.35);
+  assert.equal(response.body.metricas.despesasPendentesFrotaPeriodo, 1700.1);
+  assert.equal(response.body.metricas.despesasPagasFrotaPeriodo, 700.15);
   assert.equal(response.body.metricas.lancamentosVencidos, 2);
   assert.equal(response.body.frota.veiculosMaiorDespesa[0].placa, "ABC1D23");
+  assert.equal(response.body.frota.despesasPorTipo[0].tipo, "abastecimento");
 });
 
 test("dashboard aplica filtro customizado", async () => {

@@ -61,10 +61,10 @@ const cards = [
     href: "/financeiro",
   },
   {
-    titulo: "Custos da Frota",
+    titulo: "Despesas de Veiculos",
     icone: "FT",
     descricao: "Controle despesas operacionais por veiculo e motorista.",
-    href: "/custos-frota",
+    href: "/despesas-veiculos",
   },
   {
     titulo: "Relatorios",

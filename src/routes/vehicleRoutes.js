@@ -17,6 +17,11 @@ router.post(
   controller.create,
 );
 router.get(
+  "/api/veiculos/:id/despesas",
+  authMiddleware({ api: true, permission: PERMISSIONS.VEHICLES_VIEW }),
+  controller.listExpenses,
+);
+router.get(
   "/api/veiculos/:id",
   authMiddleware({ api: true, permission: PERMISSIONS.VEHICLES_VIEW }),
   controller.show,

@@ -8,7 +8,9 @@ function mapVehicleExpense(row) {
   }
 
   const derivedStatus =
-    row.ativo === false ? "cancelado" : row.status || (row.dataPagamento ? "pago" : "pendente");
+    row.ativo === false
+      ? "cancelado"
+      : row.expenseStatus || (row.dataPagamento ? "pago" : "pendente");
 
   return {
     id: row.id,
@@ -45,7 +47,7 @@ function mapVehicleExpense(row) {
     financeiro: row.lancamentoFinanceiroId
       ? {
           id: row.lancamentoFinanceiroId,
-          status: derivedStatus,
+          status: row.financialStatus || derivedStatus,
           dataCompetencia: row.dataDespesa,
           dataVencimento: row.dataVencimento,
           dataPagamento: row.dataPagamento,
@@ -67,7 +69,8 @@ function buildSelectQuery() {
       dv.tipo,
       dv.descricao,
       dv.valor,
-      lf.status,
+      dv.status AS "expenseStatus",
+      lf.status AS "financialStatus",
       TO_CHAR(dv.data_despesa, 'YYYY-MM-DD') AS "dataDespesa",
       TO_CHAR(dv.data_vencimento, 'YYYY-MM-DD') AS "dataVencimento",
       TO_CHAR(dv.data_pagamento, 'YYYY-MM-DD') AS "dataPagamento",
@@ -87,7 +90,7 @@ function buildSelectQuery() {
 }
 
 async function createFinancialEntry(client, context, payload) {
-  const status = payload.status || "pendente";
+  const status = payload.status === "pago" ? "pago" : "pendente";
   const dataPagamento =
     status === "pago"
       ? payload.dataPagamento || new Date().toISOString().slice(0, 10)
@@ -193,7 +196,7 @@ async function listByUserId(actor, filters = {}) {
 
   if (filters.status) {
     values.push(filters.status);
-    conditions.push(`lf.status = $${values.length}`);
+    conditions.push(`dv.status = $${values.length}`);
   }
 
   if (filters.dataInicio) {
@@ -257,12 +260,13 @@ async function create(actor, payload) {
         tipo,
         descricao,
         valor,
+        status,
         data_despesa,
         data_vencimento,
         data_pagamento,
         observacoes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING id`,
       [
         context.userId,
@@ -273,6 +277,7 @@ async function create(actor, payload) {
         payload.tipo,
         payload.descricao,
         payload.valor,
+        status,
         payload.dataDespesa,
         payload.dataVencimento || null,
         dataPagamento,
@@ -364,11 +369,12 @@ async function updateById(actor, expenseId, payload) {
           tipo = $${expenseTenant.nextIndex + 2},
           descricao = $${expenseTenant.nextIndex + 3},
           valor = $${expenseTenant.nextIndex + 4},
-          lancamento_financeiro_id = $${expenseTenant.nextIndex + 5},
-          data_despesa = $${expenseTenant.nextIndex + 6},
-          data_vencimento = $${expenseTenant.nextIndex + 7},
-          data_pagamento = $${expenseTenant.nextIndex + 8},
-          observacoes = $${expenseTenant.nextIndex + 9},
+          status = $${expenseTenant.nextIndex + 5},
+          lancamento_financeiro_id = $${expenseTenant.nextIndex + 6},
+          data_despesa = $${expenseTenant.nextIndex + 7},
+          data_vencimento = $${expenseTenant.nextIndex + 8},
+          data_pagamento = $${expenseTenant.nextIndex + 9},
+          observacoes = $${expenseTenant.nextIndex + 10},
           atualizado_em = NOW()
       WHERE id = $1 AND ${expenseTenant.condition}`,
       [
@@ -379,6 +385,7 @@ async function updateById(actor, expenseId, payload) {
         merged.tipo,
         merged.descricao,
         merged.valor,
+        merged.status,
         linkedFinancialId,
         merged.dataDespesa,
         merged.dataVencimento || null,
@@ -435,7 +442,7 @@ async function deleteById(actor, expenseId) {
     const tenant = buildTenantCondition({ actor, tableAlias: "despesas_veiculos", startIndex: 2 });
     await client.query(
       `UPDATE despesas_veiculos
-      SET ativo = FALSE, atualizado_em = NOW()
+      SET ativo = FALSE, status = 'cancelado', atualizado_em = NOW()
       WHERE id = $1 AND ${tenant.condition}`,
       [expenseId, ...tenant.params],
     );
@@ -457,6 +464,14 @@ async function deleteById(actor, expenseId) {
   } finally {
     client.release();
   }
+}
+
+async function updateStatusById(actor, expenseId, status, dataPagamento) {
+  return updateById(actor, expenseId, { status, dataPagamento });
+}
+
+async function listByVehicleId(actor, vehicleId, filters = {}) {
+  return listByUserId(actor, { ...filters, veiculoId: vehicleId });
 }
 
 async function listSupportData(actor) {
@@ -496,9 +511,11 @@ async function listSupportData(actor) {
 
 module.exports = {
   listByUserId,
+  listByVehicleId,
   findById,
   create,
   updateById,
+  updateStatusById,
   deleteById,
   listSupportData,
 };

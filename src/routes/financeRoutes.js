@@ -43,6 +43,11 @@ router.patch(
   fleetCostController.update,
 );
 router.patch(
+  "/api/financeiro/despesas-veiculos/:id/status",
+  authMiddleware({ api: true, permission: PERMISSIONS.FINANCE_MANAGE }),
+  fleetCostController.updateStatus,
+);
+router.patch(
   "/api/financeiro/:id",
   authMiddleware({ api: true, permission: PERMISSIONS.FINANCE_MANAGE }),
   controller.update,

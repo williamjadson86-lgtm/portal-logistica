@@ -55,6 +55,7 @@ const modulePages = [
   "/manutencoes-veiculos",
   "/comprovantes",
   "/financeiro",
+  "/despesas-veiculos",
   "/custos-frota",
   "/fluxo-caixa",
   "/relatorios",
@@ -140,7 +141,7 @@ test("home api retorna dashboard de entregas autenticado", async () => {
   assert.equal(response.body.dashboard.entregasEntregues, 4);
   assert.equal(response.body.rotas.rotasPlanejadas, 2);
   assert.equal(response.body.cards.length, 11);
-  assert.ok(response.body.cards.some((card) => card.href === "/custos-frota"));
+  assert.ok(response.body.cards.some((card) => card.href === "/despesas-veiculos"));
   assert.ok(response.body.cards.some((card) => card.href === "/manutencoes-veiculos"));
 });
 
@@ -419,7 +420,7 @@ test("apis dos modulos auxiliares respondem autenticadas", async () => {
     request(app).get("/api/rotas").set("Cookie", createCookie("administrador")),
     request(app).get("/api/comprovantes").set("Cookie", createCookie("administrador")),
     request(app).get("/api/financeiro").set("Cookie", createCookie("administrador")),
-    request(app).get("/api/custos-frota").set("Cookie", createCookie("administrador")),
+    request(app).get("/api/despesas-veiculos").set("Cookie", createCookie("administrador")),
     request(app).get("/api/manutencoes-veiculos").set("Cookie", createCookie("administrador")),
     request(app).get("/api/documentos").set("Cookie", createCookie("administrador")),
     request(app).get("/api/suporte").set("Cookie", createCookie("administrador")),

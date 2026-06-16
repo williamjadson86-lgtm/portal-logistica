@@ -1,4 +1,4 @@
-const { FINANCIAL_STATUSES, isValidUuid } = require("./financialValidation");
+const { isValidUuid } = require("./financialValidation");
 
 const VEHICLE_EXPENSE_TYPES = [
   "abastecimento",
@@ -8,6 +8,8 @@ const VEHICLE_EXPENSE_TYPES = [
   "multa",
   "outros",
 ];
+
+const VEHICLE_EXPENSE_STATUSES = ["pendente", "pago", "cancelado"];
 
 function parseText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -124,7 +126,7 @@ function validateVehicleExpensePayload(input, options = {}) {
 
   if (Object.hasOwn(input, "status")) {
     const status = parseText(input.status);
-    if (!FINANCIAL_STATUSES.includes(status)) {
+    if (!VEHICLE_EXPENSE_STATUSES.includes(status)) {
       errors.push("status invalido");
     } else {
       data.status = status;
@@ -196,14 +198,6 @@ function validateVehicleExpensePayload(input, options = {}) {
     errors.push("dataPagamento e obrigatoria para status pago");
   }
 
-  if (
-    data.integrarFinanceiro === false &&
-    data.status &&
-    ["faturado", "cancelado"].includes(data.status)
-  ) {
-    errors.push("status informado exige integracao financeira");
-  }
-
   if (partial && Object.keys(data).length === 0) {
     errors.push("informe ao menos um campo para atualizar");
   }
@@ -242,7 +236,7 @@ function validateVehicleExpenseFilters(input) {
 
   if (Object.hasOwn(input, "status") && input.status !== "") {
     const status = parseText(input.status);
-    if (!FINANCIAL_STATUSES.includes(status)) {
+    if (!VEHICLE_EXPENSE_STATUSES.includes(status)) {
       errors.push("status invalido");
     } else {
       data.status = status;
@@ -278,6 +272,7 @@ function validateVehicleExpenseFilters(input) {
 
 module.exports = {
   VEHICLE_EXPENSE_TYPES,
+  VEHICLE_EXPENSE_STATUSES,
   validateVehicleExpenseCreate: (input) => validateVehicleExpensePayload(input),
   validateVehicleExpenseUpdate: (input) => validateVehicleExpensePayload(input, { partial: true }),
   validateVehicleExpenseFilters,

@@ -100,6 +100,7 @@ const CARD_PERMISSIONS = {
   "/manutencoes-veiculos": PERMISSIONS.VEHICLES_VIEW,
   "/comprovantes": PERMISSIONS.PROOFS_VIEW,
   "/financeiro": PERMISSIONS.FINANCE_VIEW,
+  "/despesas-veiculos": PERMISSIONS.FLEET_COSTS_VIEW,
   "/custos-frota": PERMISSIONS.FLEET_COSTS_VIEW,
   "/relatorios": PERMISSIONS.REPORTS_VIEW,
   "/documentos": PERMISSIONS.DOCUMENTS_VIEW,

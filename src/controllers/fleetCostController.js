@@ -21,7 +21,7 @@ function ensureFound(expense) {
 }
 
 function page(_req, res) {
-  res.sendFile(resolveView("custos-frota.html"));
+  res.sendFile(resolveView("despesas-veiculos.html"));
 }
 
 function buildSummary(items) {
@@ -31,11 +31,11 @@ function buildSummary(items) {
       if (item.status === "pago") {
         accumulator.pago += item.valor;
       }
-      if (["pendente", "faturado"].includes(item.status)) {
+      if (item.status === "pendente") {
         accumulator.pendente += item.valor;
       }
       if (item.dataVencimento && item.dataVencimento < new Date().toISOString().slice(0, 10)) {
-        accumulator.vencidas += ["pendente", "faturado"].includes(item.status) ? 1 : 0;
+        accumulator.vencidas += item.status === "pendente" ? 1 : 0;
       }
       if (item.integrarFinanceiro) {
         accumulator.integradas += 1;
@@ -123,6 +123,26 @@ async function update(req, res) {
   });
 }
 
+async function updateStatus(req, res) {
+  ensureValidUuid(req.params.id);
+  const { errors, data } = validateVehicleExpenseUpdate(req.body);
+  if (errors.length > 0 || !data.status) {
+    throw new HttpError(400, "Dados invalidos", errors.length > 0 ? errors : ["status invalido"]);
+  }
+
+  const expense = await repository.updateStatusById(
+    req.user,
+    req.params.id,
+    data.status,
+    data.dataPagamento,
+  );
+  ensureFound(expense);
+  res.json({
+    mensagem: "Status da despesa de veiculo atualizado com sucesso",
+    despesa: expense,
+  });
+}
+
 async function remove(req, res) {
   ensureValidUuid(req.params.id);
   const expense = await repository.deleteById(req.user, req.params.id);
@@ -139,6 +159,7 @@ module.exports = {
   show,
   create,
   update,
+  updateStatus,
   remove,
   buildSummary,
 };

@@ -1,4 +1,5 @@
 const repository = require("../repositories/vehicleRepository");
+const fleetCostRepository = require("../repositories/fleetCostRepository");
 const HttpError = require("../errors/HttpError");
 const resolveView = require("../utils/viewResolver");
 const {
@@ -46,6 +47,34 @@ async function show(req, res) {
   res.json({ veiculo });
 }
 
+async function listExpenses(req, res) {
+  ensureValidUuid(req.params.id);
+  const veiculo = await repository.findById(req.user, req.params.id);
+  ensureFound(veiculo);
+
+  const despesas = await fleetCostRepository.listByVehicleId(req.user, req.params.id);
+  res.json({
+    veiculo,
+    resumo: {
+      totalDespesas: despesas.length,
+      totalPago: Number(
+        despesas
+          .filter((item) => item.status === "pago")
+          .reduce((sum, item) => sum + item.valor, 0)
+          .toFixed(2),
+      ),
+      totalPendente: Number(
+        despesas
+          .filter((item) => item.status === "pendente")
+          .reduce((sum, item) => sum + item.valor, 0)
+          .toFixed(2),
+      ),
+      valorTotal: Number(despesas.reduce((sum, item) => sum + item.valor, 0).toFixed(2)),
+    },
+    despesas,
+  });
+}
+
 async function create(req, res) {
   const { errors, data } = validateVehicleCreate(req.body);
   if (errors.length > 0) {
@@ -91,4 +120,4 @@ async function remove(req, res) {
   res.json({ mensagem: "Veiculo excluido com sucesso" });
 }
 
-module.exports = { page, list, show, create, update, updateStatus, remove };
+module.exports = { page, list, show, listExpenses, create, update, updateStatus, remove };

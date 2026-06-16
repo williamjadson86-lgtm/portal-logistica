@@ -106,6 +106,18 @@ async function getOperationalDashboard(actor, filter) {
   const totalDespesasFrotaPeriodo = Number(
     vehicleExpenses.reduce((sum, entry) => sum + entry.valor, 0).toFixed(2),
   );
+  const despesasPagasFrotaPeriodo = Number(
+    vehicleExpenses
+      .filter((entry) => entry.status === "pago")
+      .reduce((sum, entry) => sum + entry.valor, 0)
+      .toFixed(2),
+  );
+  const despesasPendentesFrotaPeriodo = Number(
+    vehicleExpenses
+      .filter((entry) => entry.status === "pendente")
+      .reduce((sum, entry) => sum + entry.valor, 0)
+      .toFixed(2),
+  );
   const custoManutencaoPeriodo = Number(
     vehicleExpenses
       .filter((entry) => entry.tipo === "manutencao")
@@ -182,6 +194,17 @@ async function getOperationalDashboard(actor, filter) {
     driverCostMap.size === 0
       ? 0
       : Number((totalDespesasFrotaPeriodo / driverCostMap.size).toFixed(2));
+  const despesasPorTipo = Object.entries(
+    vehicleExpenses.reduce((accumulator, expense) => {
+      accumulator[expense.tipo] = Number(
+        ((accumulator[expense.tipo] || 0) + expense.valor).toFixed(2),
+      );
+      return accumulator;
+    }, {}),
+  )
+    .map(([tipo, valor]) => ({ tipo, valor }))
+    .sort((left, right) => right.valor - left.valor);
+  const despesasPorVeiculo = veiculosMaiorDespesa;
 
   return {
     filtro: {
@@ -205,6 +228,8 @@ async function getOperationalDashboard(actor, filter) {
       manutencoesProgramadas: maintenances.length,
       receitaTotalPeriodo,
       totalDespesasFrotaPeriodo,
+      despesasPendentesFrotaPeriodo,
+      despesasPagasFrotaPeriodo,
       custoManutencaoPeriodo,
       lucroOperacionalPeriodo,
       resultadoLiquidoPeriodo: lucroOperacionalPeriodo,
@@ -249,6 +274,8 @@ async function getOperationalDashboard(actor, filter) {
       manutencoesConcluidasPeriodo,
       receitaTotalPeriodo,
       totalDespesasFrotaPeriodo,
+      despesasPendentesFrotaPeriodo,
+      despesasPagasFrotaPeriodo,
       custoManutencaoPeriodo,
       lucroOperacionalPeriodo,
       resultadoLiquidoPeriodo: lucroOperacionalPeriodo,
@@ -260,9 +287,13 @@ async function getOperationalDashboard(actor, filter) {
     },
     frota: {
       custoTotalFrotaPeriodo: totalDespesasFrotaPeriodo,
+      despesasPendentesFrotaPeriodo,
+      despesasPagasFrotaPeriodo,
       custoManutencaoPeriodo,
       custoMedioPorVeiculo,
       custoMedioPorMotorista,
+      despesasPorVeiculo,
+      despesasPorTipo,
       veiculosMaiorDespesa,
       motoristasMaiorDespesa,
       manutencoesVencidas,

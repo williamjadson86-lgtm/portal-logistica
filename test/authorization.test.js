@@ -98,7 +98,7 @@ test("financeiro acessa financeiro e relatorios, mas nao motoristas", async () =
   const [financePage, reportsPage, fleetPage, driversApi] = await Promise.all([
     request(app).get("/financeiro").set("Cookie", createCookie("financeiro")),
     request(app).get("/relatorios").set("Cookie", createCookie("financeiro")),
-    request(app).get("/custos-frota").set("Cookie", createCookie("financeiro")),
+    request(app).get("/despesas-veiculos").set("Cookie", createCookie("financeiro")),
     request(app).get("/api/motoristas").set("Cookie", createCookie("financeiro")),
   ]);
 
@@ -111,8 +111,8 @@ test("financeiro acessa financeiro e relatorios, mas nao motoristas", async () =
 test("colaborador nao acessa custos da frota e operador acessa o modulo", async () => {
   mockUser("colaborador");
   const [deniedResponse, deniedApiResponse, deniedMaintenancePage, deniedMaintenanceApi] = await Promise.all([
-    request(app).get("/custos-frota").set("Cookie", createCookie("colaborador")),
-    request(app).get("/api/custos-frota").set("Cookie", createCookie("colaborador")),
+    request(app).get("/despesas-veiculos").set("Cookie", createCookie("colaborador")),
+    request(app).get("/api/despesas-veiculos").set("Cookie", createCookie("colaborador")),
     request(app).get("/manutencoes-veiculos").set("Cookie", createCookie("colaborador")),
     request(app).get("/api/manutencoes-veiculos").set("Cookie", createCookie("colaborador")),
   ]);
@@ -126,7 +126,7 @@ test("colaborador nao acessa custos da frota e operador acessa o modulo", async 
 
   mockUser("operador");
   const [allowedResponse, allowedMaintenanceResponse] = await Promise.all([
-    request(app).get("/custos-frota").set("Cookie", createCookie("operador")),
+    request(app).get("/despesas-veiculos").set("Cookie", createCookie("operador")),
     request(app).get("/manutencoes-veiculos").set("Cookie", createCookie("operador")),
   ]);
 
@@ -155,6 +155,6 @@ test("administrador mantem acesso total e visualiza todos os cards da home", asy
 
   assert.equal(response.status, 200);
   assert.equal(response.body.cards.length, 15);
-  assert.ok(response.body.cards.some((card) => card.href === "/custos-frota"));
+  assert.ok(response.body.cards.some((card) => card.href === "/despesas-veiculos"));
   assert.ok(response.body.cards.some((card) => card.href === "/manutencoes-veiculos"));
 });

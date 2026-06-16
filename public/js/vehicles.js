@@ -4,7 +4,7 @@ function createVehiclesApp() {
     return;
   }
 
-  const { requestJson, setMessage, serializeForm, createStatusLabel } = window.portalUtils;
+  const { requestJson, setMessage, serializeForm, createStatusLabel, formatCurrency } = window.portalUtils;
   const message = document.querySelector("[data-vehicle-message]");
   const summary = document.querySelector("[data-vehicle-summary]");
   const form = document.querySelector("[data-vehicle-form]");
@@ -13,6 +13,8 @@ function createVehiclesApp() {
   const cancelEditButton = document.querySelector("[data-cancel-edit-button]");
   const tableBody = document.querySelector("[data-vehicles-table-body]");
   const details = document.querySelector("[data-vehicle-details]");
+  const expenseSummary = document.querySelector("[data-vehicle-expense-summary]");
+  const expenseList = document.querySelector("[data-vehicle-expense-list]");
   const statusForm = document.querySelector("[data-vehicle-status-form]");
   const statusQuickSelect = statusForm.querySelector("[name='status']");
   const refreshButton = document.querySelector("[data-refresh-button]");
@@ -76,6 +78,8 @@ function createVehiclesApp() {
     if (!vehicle) {
       details.className = "delivery-details empty";
       details.textContent = "Selecione um veiculo para visualizar os detalhes da frota.";
+      expenseSummary.innerHTML = "";
+      expenseList.textContent = "Selecione um veiculo para consultar despesas relacionadas.";
       statusQuickSelect.value = "disponivel";
       return;
     }
@@ -92,6 +96,59 @@ function createVehiclesApp() {
       </div>
     `;
     statusQuickSelect.value = vehicle.status;
+  }
+
+  function renderVehicleExpenses(payload) {
+    if (!payload || !Array.isArray(payload.despesas) || payload.despesas.length === 0) {
+      expenseSummary.innerHTML = `
+        <article class="stat-card compact">
+          <span>Total de despesas</span>
+          <strong>0</strong>
+        </article>
+      `;
+      expenseList.innerHTML = `
+        <article class="data-card empty">
+          <strong>Sem despesas vinculadas</strong>
+          <p>Este veiculo ainda nao possui despesas ativas no periodo atual.</p>
+        </article>
+      `;
+      return;
+    }
+
+    expenseSummary.innerHTML = [
+      { rotulo: "Total de despesas", valor: payload.resumo.totalDespesas },
+      { rotulo: "Valor total", valor: formatCurrency(payload.resumo.valorTotal) },
+      { rotulo: "Pago", valor: formatCurrency(payload.resumo.totalPago) },
+      { rotulo: "Pendente", valor: formatCurrency(payload.resumo.totalPendente) },
+    ]
+      .map(
+        (item) => `
+          <article class="stat-card compact">
+            <span>${item.rotulo}</span>
+            <strong>${item.valor}</strong>
+          </article>
+        `,
+      )
+      .join("");
+
+    expenseList.innerHTML = payload.despesas
+      .slice(0, 5)
+      .map(
+        (item) => `
+          <article class="data-card">
+            <div class="data-card-top">
+              <div>
+                <h3>${item.descricao}</h3>
+                <p>${item.tipo} | ${item.dataDespesa || "Sem data"}</p>
+              </div>
+              <span class="status-tag">${createStatusLabel(item.status)}</span>
+            </div>
+            <strong>${formatCurrency(item.valor)}</strong>
+            <p>${item.motorista?.nome || "Sem motorista vinculado"}</p>
+          </article>
+        `,
+      )
+      .join("");
   }
 
   function renderTable() {
@@ -121,10 +178,14 @@ function createVehiclesApp() {
   }
 
   async function loadDetails(vehicleId) {
-    const response = await requestJson(`/api/veiculos/${vehicleId}`);
-    selectedVehicleId = response.veiculo.id;
-    renderDetails(response.veiculo);
-    return response.veiculo;
+    const [vehicleResponse, expensesResponse] = await Promise.all([
+      requestJson(`/api/veiculos/${vehicleId}`),
+      requestJson(`/api/veiculos/${vehicleId}/despesas`),
+    ]);
+    selectedVehicleId = vehicleResponse.veiculo.id;
+    renderDetails(vehicleResponse.veiculo);
+    renderVehicleExpenses(expensesResponse);
+    return vehicleResponse.veiculo;
   }
 
   async function refreshList(options = {}) {

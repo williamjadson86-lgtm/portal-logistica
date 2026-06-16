@@ -11,6 +11,7 @@ const originalRepositories = {
   findById: userRepository.findById,
   listByUserId: vehicleRepository.listByUserId,
   findVehicleById: vehicleRepository.findById,
+  listByVehicleId: require("../src/repositories/fleetCostRepository").listByVehicleId,
   create: vehicleRepository.create,
   updateById: vehicleRepository.updateById,
   updateStatusById: vehicleRepository.updateStatusById,
@@ -21,6 +22,7 @@ function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
   vehicleRepository.listByUserId = originalRepositories.listByUserId;
   vehicleRepository.findById = originalRepositories.findVehicleById;
+  require("../src/repositories/fleetCostRepository").listByVehicleId = originalRepositories.listByVehicleId;
   vehicleRepository.create = originalRepositories.create;
   vehicleRepository.updateById = originalRepositories.updateById;
   vehicleRepository.updateStatusById = originalRepositories.updateStatusById;
@@ -121,6 +123,41 @@ test("atualiza status do veiculo", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(response.body.veiculo.status, "manutencao");
+});
+
+test("lista despesas relacionadas ao veiculo autenticado", async () => {
+  const fleetCostRepository = require("../src/repositories/fleetCostRepository");
+  mockAuthenticatedUser();
+  vehicleRepository.findById = async () => ({
+    id: "f217a4bd-3a9b-4695-bd9b-55f6c74f7498",
+    placa: "ABC1D23",
+    modelo: "Sprinter",
+    tipo: "Van",
+    capacidade: 1500,
+    ano: 2024,
+    status: "disponivel",
+  });
+  fleetCostRepository.listByVehicleId = async () => [
+    {
+      id: "94b8de94-7223-4563-bb03-91325afaf970",
+      descricao: "Abastecimento rodoviario",
+      tipo: "abastecimento",
+      valor: 320.75,
+      status: "pendente",
+      dataDespesa: "2026-06-12",
+      motorista: { nome: "Paulo Nunes" },
+    },
+  ];
+
+  const response = await request(app)
+    .get("/api/veiculos/f217a4bd-3a9b-4695-bd9b-55f6c74f7498/despesas")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.veiculo.placa, "ABC1D23");
+  assert.equal(response.body.resumo.totalDespesas, 1);
+  assert.equal(response.body.resumo.valorTotal, 320.75);
+  assert.equal(response.body.despesas[0].descricao, "Abastecimento rodoviario");
 });
 
 test("exclui veiculo", async () => {

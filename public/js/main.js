@@ -361,6 +361,16 @@ function renderDashboardFleet(data) {
       descricao: "Media de custo entre motoristas com despesa vinculada.",
     },
     {
+      titulo: "Despesas pendentes",
+      valor: formatCurrency(fleet.despesasPendentesFrotaPeriodo || 0),
+      descricao: "Custos da frota ainda em aberto dentro da janela filtrada.",
+    },
+    {
+      titulo: "Despesas pagas",
+      valor: formatCurrency(fleet.despesasPagasFrotaPeriodo || 0),
+      descricao: "Volume de despesas ja quitadas no periodo analisado.",
+    },
+    {
       titulo: "Custo de manutencao",
       valor: formatCurrency(fleet.custoManutencaoPeriodo || 0),
       descricao: "Custos de manutencao refletidos no resultado operacional da frota.",
@@ -438,6 +448,21 @@ function renderDashboardFleet(data) {
               )
               .join("")
           : "<p>Nenhum motorista com despesa vinculada no periodo.</p>"
+      }
+    </article>
+    <article class="data-card">
+      <h3>Tipos com maior impacto</h3>
+      ${
+        Array.isArray(fleet.despesasPorTipo) && fleet.despesasPorTipo.length > 0
+          ? fleet.despesasPorTipo
+              .slice(0, 5)
+              .map(
+                (item, index) => `
+                  <p>${index + 1}. ${createStatusLabel(item.tipo)} | ${formatCurrency(item.valor)}</p>
+                `,
+              )
+              .join("")
+          : "<p>Nenhum tipo consolidado no periodo.</p>"
       }
     </article>
   `;

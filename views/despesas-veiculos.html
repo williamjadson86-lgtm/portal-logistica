@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Logistica | Despesas de Veiculos</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <main
+      class="portal-shell deliveries-page"
+      data-vehicle-expenses-page
+      data-api-base="/api/despesas-veiculos"
+    >
+      <section class="page-card">
+        <header class="portal-header">
+          <div>
+            <span class="status-pill">Operacao ativa</span>
+            <h1>Despesas de veiculos</h1>
+            <p>Cadastre custos da frota, acompanhe pendencias e mantenha o financeiro alinhado.</p>
+          </div>
+          <div class="header-actions">
+            <a class="button ghost" href="/home">Voltar para home</a>
+            <button class="button ghost" type="button" data-logout-button>Sair</button>
+          </div>
+        </header>
+
+        <div class="message" data-fleet-cost-message></div>
+        <section class="module-summary-grid" data-fleet-cost-summary></section>
+
+        <section class="deliveries-layout">
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Filtros</span>
+                <h2>Refinar despesas</h2>
+              </div>
+              <button class="button ghost" type="button" data-fleet-cost-refresh-button>Atualizar</button>
+            </div>
+
+            <form class="grid-form two-columns" data-fleet-cost-filter-form>
+              <div class="field">
+                <label for="vehicleExpenseFilterVeiculo">Veiculo</label>
+                <select id="vehicleExpenseFilterVeiculo" name="veiculoId">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseFilterMotorista">Motorista</label>
+                <select id="vehicleExpenseFilterMotorista" name="motoristaId">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseFilterTipo">Tipo</label>
+                <select id="vehicleExpenseFilterTipo" name="tipo">
+                  <option value="">Todos</option>
+                  <option value="abastecimento">Abastecimento</option>
+                  <option value="pedagio">Pedagio</option>
+                  <option value="manutencao">Manutencao</option>
+                  <option value="seguro">Seguro</option>
+                  <option value="multa">Multa</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseFilterStatus">Status</label>
+                <select id="vehicleExpenseFilterStatus" name="status">
+                  <option value="">Todos</option>
+                  <option value="pendente">Pendente</option>
+                  <option value="pago">Pago</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseFilterInicio">Data inicial</label>
+                <input id="vehicleExpenseFilterInicio" name="dataInicio" type="date" />
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseFilterFim">Data final</label>
+                <input id="vehicleExpenseFilterFim" name="dataFim" type="date" />
+              </div>
+              <div class="actions field full">
+                <button class="button primary" type="submit">Aplicar filtros</button>
+                <button class="button ghost" type="button" data-fleet-cost-clear-filters-button>
+                  Limpar filtros
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article class="module-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="status-pill subtle">Cadastro</span>
+                <h2 data-fleet-cost-form-title>Nova despesa</h2>
+              </div>
+              <button class="button ghost" type="button" data-fleet-cost-new-button>Nova despesa</button>
+            </div>
+
+            <form class="grid-form two-columns" data-fleet-cost-form>
+              <input type="hidden" name="id" />
+              <div class="field">
+                <label for="vehicleExpenseTipo">Tipo</label>
+                <select id="vehicleExpenseTipo" name="tipo" required>
+                  <option value="abastecimento">Abastecimento</option>
+                  <option value="pedagio">Pedagio</option>
+                  <option value="manutencao">Manutencao</option>
+                  <option value="seguro">Seguro</option>
+                  <option value="multa">Multa</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseStatus">Status</label>
+                <select id="vehicleExpenseStatus" name="status" required>
+                  <option value="pendente">Pendente</option>
+                  <option value="pago">Pago</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="vehicleExpenseDescricao">Descricao</label>
+                <input id="vehicleExpenseDescricao" name="descricao" maxlength="160" required />
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseVeiculo">Veiculo</label>
+                <select id="vehicleExpenseVeiculo" name="veiculoId" required>
+                  <option value="">Selecione</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseMotorista">Motorista</label>
+                <select id="vehicleExpenseMotorista" name="motoristaId">
+                  <option value="">Nao vincular</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseValor">Valor</label>
+                <input id="vehicleExpenseValor" name="valor" type="number" min="0.01" step="0.01" required />
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseDataDespesa">Data da despesa</label>
+                <input id="vehicleExpenseDataDespesa" name="dataDespesa" type="date" required />
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseDataVencimento">Data de vencimento</label>
+                <input id="vehicleExpenseDataVencimento" name="dataVencimento" type="date" />
+              </div>
+              <div class="field">
+                <label for="vehicleExpenseDataPagamento">Data de pagamento</label>
+                <input id="vehicleExpenseDataPagamento" name="dataPagamento" type="date" />
+              </div>
+              <div class="field full">
+                <label class="checkbox-field" for="vehicleExpenseIntegrarFinanceiro">
+                  <input
+                    id="vehicleExpenseIntegrarFinanceiro"
+                    name="integrarFinanceiro"
+                    type="checkbox"
+                    checked
+                  />
+                  Integrar automaticamente com o financeiro
+                </label>
+              </div>
+              <div class="field full">
+                <label for="vehicleExpenseObservacoes">Observacoes</label>
+                <textarea id="vehicleExpenseObservacoes" name="observacoes" rows="4" maxlength="2000"></textarea>
+              </div>
+              <div class="actions field full">
+                <button class="button primary" type="submit" data-fleet-cost-submit-button>
+                  Salvar despesa
+                </button>
+                <button class="button ghost" type="button" data-fleet-cost-cancel-edit-button hidden>
+                  Cancelar edicao
+                </button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <section class="module-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="status-pill subtle">Historico</span>
+              <h2>Despesas registradas</h2>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <table class="deliveries-table">
+              <thead>
+                <tr>
+                  <th>Descricao</th>
+                  <th>Tipo</th>
+                  <th>Veiculo</th>
+                  <th>Motorista</th>
+                  <th>Status</th>
+                  <th>Financeiro</th>
+                  <th>Data</th>
+                  <th>Valor</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody data-fleet-cost-table-body>
+                <tr><td colspan="9">Carregando despesas...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/public/js/main.js"></script>
+    <script src="/public/js/vehicleExpenses.js"></script>
+  </body>
+</html>

@@ -14,6 +14,7 @@ const originalRepositories = {
   findExpenseById: fleetCostRepository.findById,
   create: fleetCostRepository.create,
   updateById: fleetCostRepository.updateById,
+  updateStatusById: fleetCostRepository.updateStatusById,
   deleteById: fleetCostRepository.deleteById,
 };
 
@@ -24,6 +25,7 @@ function restoreRepositories() {
   fleetCostRepository.findById = originalRepositories.findExpenseById;
   fleetCostRepository.create = originalRepositories.create;
   fleetCostRepository.updateById = originalRepositories.updateById;
+  fleetCostRepository.updateStatusById = originalRepositories.updateStatusById;
   fleetCostRepository.deleteById = originalRepositories.deleteById;
 }
 
@@ -107,13 +109,13 @@ test("despesas de veiculos exigem autenticacao", async () => {
   assert.equal(response.body.erro, "Autenticacao obrigatoria");
 });
 
-test("nova tela de custos da frota carrega autenticada", async () => {
+test("nova tela de despesas de veiculos carrega autenticada", async () => {
   mockAuthenticatedUser();
 
-  const response = await request(app).get("/custos-frota").set("Cookie", createCookie());
+  const response = await request(app).get("/despesas-veiculos").set("Cookie", createCookie());
 
   assert.equal(response.status, 200);
-  assert.match(response.text, /Custos da Frota|Custos da frota/);
+  assert.match(response.text, /Despesas de veiculos/i);
 });
 
 test("lista despesas da frota com resumo e apoio", async () => {
@@ -157,7 +159,7 @@ test("rota dedicada lista despesas com filtros", async () => {
   fleetCostRepository.listSupportData = async () => ({ veiculos: [], motoristas: [] });
 
   const response = await request(app)
-    .get("/api/custos-frota?veiculoId=77a306c2-658d-473b-9631-e4a6416286fe&tipo=abastecimento&dataInicio=2026-06-01&dataFim=2026-06-30")
+    .get("/api/despesas-veiculos?veiculoId=77a306c2-658d-473b-9631-e4a6416286fe&tipo=abastecimento&dataInicio=2026-06-01&dataFim=2026-06-30")
     .set("Cookie", createCookie());
 
   assert.equal(response.status, 200);
@@ -224,6 +226,35 @@ test("atualiza despesa da frota existente", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.despesa.status, "pago");
   assert.equal(response.body.despesa.valor, 410.35);
+});
+
+test("atualiza status da despesa por rota dedicada", async () => {
+  mockAuthenticatedUser();
+  let receivedArgs = null;
+  fleetCostRepository.updateStatusById = async (_user, id, status, dataPagamento) => {
+    receivedArgs = { id, status, dataPagamento };
+    return createExpense({
+      id,
+      status,
+      dataPagamento,
+    });
+  };
+
+  const response = await request(app)
+    .patch("/api/despesas-veiculos/f9cceef1-ff33-4adf-8151-96020f9f481d/status")
+    .set("Cookie", createCookie())
+    .send({
+      status: "pago",
+      dataPagamento: "2026-06-14",
+    });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(receivedArgs, {
+    id: "f9cceef1-ff33-4adf-8151-96020f9f481d",
+    status: "pago",
+    dataPagamento: "2026-06-14",
+  });
+  assert.equal(response.body.despesa.status, "pago");
 });
 
 test("cancela despesa da frota", async () => {
