@@ -64,8 +64,10 @@ async function create(req, res) {
 
   const delivery = await repository.create(req.user, data);
   await eventRepository.appendEvent({
+    actor: req.user,
     entregaId: delivery.id,
     usuarioId: req.user?.id || null,
+    empresaId: req.user?.empresaId || null,
     tipoEvento: "entrega_criada",
     descricao: `Entrega ${delivery.codigo} cadastrada para ${delivery.cliente}`,
     dados: {
@@ -98,8 +100,10 @@ async function update(req, res) {
   }
 
   await eventRepository.appendEvent({
+    actor: req.user,
     entregaId: delivery.id,
     usuarioId: req.user?.id || null,
+    empresaId: req.user?.empresaId || null,
     tipoEvento: "entrega_atualizada",
     descricao: `Entrega ${delivery.codigo} atualizada`,
     dados: {
@@ -130,8 +134,10 @@ async function updateStatus(req, res) {
   }
 
   await eventRepository.appendEvent({
+    actor: req.user,
     entregaId: delivery.id,
     usuarioId: req.user?.id || null,
+    empresaId: req.user?.empresaId || null,
     tipoEvento: "status_alterado",
     descricao: `Status da entrega ${delivery.codigo} alterado para ${delivery.status}`,
     dados: {

@@ -395,6 +395,11 @@ async function updateById(actor, expenseId, payload) {
     );
 
     if (linkedFinancialId) {
+      const financialTenant = buildTenantCondition({
+        actor,
+        tableAlias: "lancamentos_financeiros",
+        startIndex: 9,
+      });
       await client.query(
         `UPDATE lancamentos_financeiros
         SET descricao = $2,
@@ -405,7 +410,7 @@ async function updateById(actor, expenseId, payload) {
             data_pagamento = $7,
             observacoes = $8,
             atualizado_em = NOW()
-        WHERE id = $1`,
+        WHERE id = $1 AND ${financialTenant.condition}`,
         [
           linkedFinancialId,
           merged.descricao,
@@ -415,6 +420,7 @@ async function updateById(actor, expenseId, payload) {
           merged.dataVencimento || null,
           effectivePayment,
           merged.observacoes || null,
+          ...financialTenant.params,
         ],
       );
     }
@@ -447,13 +453,18 @@ async function deleteById(actor, expenseId) {
       [expenseId, ...tenant.params],
     );
     if (current.lancamentoFinanceiroId) {
+      const financialTenant = buildTenantCondition({
+        actor,
+        tableAlias: "lancamentos_financeiros",
+        startIndex: 2,
+      });
       await client.query(
         `UPDATE lancamentos_financeiros
         SET status = 'cancelado',
             data_pagamento = NULL,
             atualizado_em = NOW()
-        WHERE id = $1`,
-        [current.lancamentoFinanceiroId],
+        WHERE id = $1 AND ${financialTenant.condition}`,
+        [current.lancamentoFinanceiroId, ...financialTenant.params],
       );
     }
     await client.query("COMMIT");

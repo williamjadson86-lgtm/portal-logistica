@@ -1,5 +1,7 @@
 const USER_ROLES = {
   ADMINISTRADOR: "administrador",
+  ADMIN: "admin",
+  GESTOR: "gestor",
   OPERADOR: "operador",
   MOTORISTA: "motorista",
   FINANCEIRO: "financeiro",
@@ -37,6 +39,34 @@ const PERMISSIONS = {
 
 const ROLE_PERMISSIONS = {
   [USER_ROLES.ADMINISTRADOR]: ["*"],
+  [USER_ROLES.GESTOR]: [
+    PERMISSIONS.HOME_VIEW,
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.NOTICES_VIEW,
+    PERMISSIONS.DELIVERIES_VIEW,
+    PERMISSIONS.DELIVERIES_MANAGE,
+    PERMISSIONS.DELIVERY_EVENTS_VIEW,
+    PERMISSIONS.ROUTES_VIEW,
+    PERMISSIONS.ROUTES_MANAGE,
+    PERMISSIONS.CLIENTS_VIEW,
+    PERMISSIONS.CLIENTS_MANAGE,
+    PERMISSIONS.DRIVERS_VIEW,
+    PERMISSIONS.DRIVERS_MANAGE,
+    PERMISSIONS.VEHICLES_VIEW,
+    PERMISSIONS.VEHICLES_MANAGE,
+    PERMISSIONS.PROOFS_VIEW,
+    PERMISSIONS.PROOFS_UPLOAD,
+    PERMISSIONS.PROOFS_MANAGE,
+    PERMISSIONS.FINANCE_VIEW,
+    PERMISSIONS.FINANCE_MANAGE,
+    PERMISSIONS.FLEET_COSTS_VIEW,
+    PERMISSIONS.FLEET_COSTS_MANAGE,
+    PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.DASHBOARD_VIEW,
+    PERMISSIONS.DOCUMENTS_VIEW,
+    PERMISSIONS.SUPPORT_VIEW,
+    PERMISSIONS.SETTINGS_VIEW,
+  ],
   [USER_ROLES.OPERADOR]: [
     PERMISSIONS.HOME_VIEW,
     PERMISSIONS.PROFILE_VIEW,
@@ -90,6 +120,16 @@ const ROLE_PERMISSIONS = {
   ],
 };
 
+const ROLE_ALIASES = {
+  [USER_ROLES.ADMIN]: USER_ROLES.ADMINISTRADOR,
+  [USER_ROLES.ADMINISTRADOR]: USER_ROLES.ADMINISTRADOR,
+  [USER_ROLES.GESTOR]: USER_ROLES.GESTOR,
+  [USER_ROLES.OPERADOR]: USER_ROLES.OPERADOR,
+  [USER_ROLES.MOTORISTA]: USER_ROLES.MOTORISTA,
+  [USER_ROLES.FINANCEIRO]: USER_ROLES.FINANCEIRO,
+  [USER_ROLES.COLABORADOR]: USER_ROLES.COLABORADOR,
+};
+
 const CARD_PERMISSIONS = {
   "/perfil": PERMISSIONS.PROFILE_VIEW,
   "/entregas": PERMISSIONS.DELIVERIES_VIEW,
@@ -109,12 +149,26 @@ const CARD_PERMISSIONS = {
   "/configuracoes": PERMISSIONS.SETTINGS_VIEW,
 };
 
+function normalizeUserRole(userOrRole) {
+  const role =
+    typeof userOrRole === "string"
+      ? userOrRole
+      : userOrRole?.tipoUsuario || userOrRole?.perfil || userOrRole?.role || null;
+
+  return ROLE_ALIASES[role] || role || null;
+}
+
+function listPermissionsForUser(user) {
+  const role = normalizeUserRole(user);
+  return ROLE_PERMISSIONS[role] || [];
+}
+
 function hasPermission(user, permission) {
   if (!permission) {
     return true;
   }
 
-  const permissions = ROLE_PERMISSIONS[user?.tipoUsuario] || [];
+  const permissions = listPermissionsForUser(user);
   return permissions.includes("*") || permissions.includes(permission);
 }
 
@@ -125,6 +179,8 @@ function filterCardsForUser(cards, user) {
 module.exports = {
   USER_ROLES,
   PERMISSIONS,
+  normalizeUserRole,
+  listPermissionsForUser,
   hasPermission,
   filterCardsForUser,
 };

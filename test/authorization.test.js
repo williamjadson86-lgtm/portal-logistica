@@ -7,6 +7,7 @@ const app = require("../src/app");
 const userRepository = require("../src/repositories/userRepository");
 const deliveryRepository = require("../src/repositories/deliveryRepository");
 const routePlanningRepository = require("../src/repositories/routePlanningRepository");
+const { hasPermission, PERMISSIONS } = require("../src/config/permissions");
 
 const originalRepository = {
   findById: userRepository.findById,
@@ -157,4 +158,40 @@ test("administrador mantem acesso total e visualiza todos os cards da home", asy
   assert.equal(response.body.cards.length, 15);
   assert.ok(response.body.cards.some((card) => card.href === "/despesas-veiculos"));
   assert.ok(response.body.cards.some((card) => card.href === "/manutencoes-veiculos"));
+});
+
+test("home informa acesso ao dashboard e aliases de perfil para usuario restrito", async () => {
+  mockUser("colaborador");
+  deliveryRepository.getDashboardSummaryForUser = async () => ({
+    total: 0,
+    emTransito: 0,
+    entregues: 0,
+    pendentes: 0,
+  });
+  routePlanningRepository.getDashboardSummaryForUser = async () => ({
+    total: 0,
+    planejadas: 0,
+    emAndamento: 0,
+    concluidas: 0,
+  });
+
+  const response = await request(app)
+    .get("/api/portal/home")
+    .set("Cookie", createCookie("colaborador"));
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.usuario.tipoUsuario, "colaborador");
+  assert.equal(response.body.usuario.perfil, "colaborador");
+  assert.equal(response.body.usuario.role, "colaborador");
+  assert.equal(response.body.usuario.empresa_id, null);
+  assert.equal(response.body.acesso.dashboard, false);
+  assert.ok(Array.isArray(response.body.permissoes));
+  assert.ok(response.body.cards.every((card) => card.href !== "/financeiro"));
+});
+
+test("alias admin herda permissoes de administrador", () => {
+  assert.equal(
+    hasPermission({ tipoUsuario: "admin" }, PERMISSIONS.SETTINGS_VIEW),
+    true,
+  );
 });

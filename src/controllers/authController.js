@@ -9,13 +9,19 @@ const {
 } = require("../validations/userValidation");
 
 function buildTokenPayload(user) {
+  const role = user.tipoUsuario || user.perfil || user.role || null;
+  const empresaId = user.empresaId || user.empresa_id || null;
+
   return {
     sub: user.id,
     userId: user.id,
     nome: user.nome,
     matricula: user.matricula,
-    tipoUsuario: user.tipoUsuario,
-    empresaId: user.empresaId || null,
+    tipoUsuario: role,
+    perfil: role,
+    role,
+    empresaId,
+    empresa_id: empresaId,
   };
 }
 
@@ -96,9 +102,12 @@ async function login(req, res) {
     usuario: {
       id: user.id,
       empresaId: user.empresaId || null,
+      empresa_id: user.empresaId || null,
       nome: user.nome,
       matricula: user.matricula,
       tipoUsuario: user.tipoUsuario,
+      perfil: user.tipoUsuario,
+      role: user.tipoUsuario,
     },
   });
 }

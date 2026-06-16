@@ -19,17 +19,17 @@ function ensureValidUuid(value, label) {
   }
 }
 
-async function registerDeliveryEvents(userId, events) {
+async function registerDeliveryEvents(actor, events) {
   if (!events.length) {
     return;
   }
 
-  await eventRepository.appendMany(
-    events.map((event) => ({
-      ...event,
-      usuarioId: userId || null,
-    })),
-  );
+  await eventRepository.appendMany(events.map((event) => ({
+    ...event,
+    actor,
+    usuarioId: actor?.id || actor?.userId || null,
+    empresaId: actor?.empresaId || actor?.empresa_id || null,
+  })));
 }
 
 async function list(req, res) {
@@ -104,7 +104,7 @@ async function addDeliveries(req, res) {
 
   const result = await repository.addDeliveries(req.user, req.params.id, data.entregaIds);
   await registerDeliveryEvents(
-    req.user?.id,
+    req.user,
     result.rota.entregas
       .filter((entrega) => data.entregaIds.includes(entrega.id))
       .map((entrega) => ({
@@ -130,7 +130,7 @@ async function removeDelivery(req, res) {
     req.params.entregaId,
   );
   const entrega = result.rota.entregas.find((item) => item.id === req.params.entregaId);
-  await registerDeliveryEvents(req.user?.id, [
+  await registerDeliveryEvents(req.user, [
     {
       entregaId: req.params.entregaId,
       tipoEvento: "removida_rota",
@@ -149,7 +149,7 @@ async function start(req, res) {
   ensureValidUuid(req.params.id, "rota");
   const result = await repository.startRoute(req.user, req.params.id);
   await registerDeliveryEvents(
-    req.user?.id,
+    req.user,
     result.rota.entregas.map((entrega) => ({
       entregaId: entrega.id,
       tipoEvento: "rota_iniciada",
@@ -168,7 +168,7 @@ async function complete(req, res) {
   ensureValidUuid(req.params.id, "rota");
   const result = await repository.completeRoute(req.user, req.params.id);
   await registerDeliveryEvents(
-    req.user?.id,
+    req.user,
     result.rota.entregas.map((entrega) => ({
       entregaId: entrega.id,
       tipoEvento: "rota_concluida",
@@ -187,7 +187,7 @@ async function cancel(req, res) {
   ensureValidUuid(req.params.id, "rota");
   const result = await repository.cancelRoute(req.user, req.params.id);
   await registerDeliveryEvents(
-    req.user?.id,
+    req.user,
     result.rota.entregas.map((entrega) => ({
       entregaId: entrega.id,
       tipoEvento: "rota_cancelada",

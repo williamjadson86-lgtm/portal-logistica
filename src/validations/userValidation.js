@@ -1,4 +1,20 @@
-const USER_TYPES = ["colaborador", "motorista", "operador", "financeiro", "administrador"];
+const USER_TYPES = [
+  "colaborador",
+  "motorista",
+  "operador",
+  "financeiro",
+  "administrador",
+  "admin",
+  "gestor",
+];
+
+function normalizeUserType(value) {
+  if (value === "admin") {
+    return "administrador";
+  }
+
+  return value;
+}
 
 function onlyDigits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -92,7 +108,7 @@ function validateRegistration(input) {
   if (!USER_TYPES.includes(input.tipoUsuario)) {
     errors.push("tipoUsuario invalido");
   } else {
-    data.tipoUsuario = input.tipoUsuario;
+    data.tipoUsuario = normalizeUserType(input.tipoUsuario);
   }
 
   return { errors, data };
@@ -121,6 +137,7 @@ function validateLogin(input) {
 
 module.exports = {
   USER_TYPES,
+  normalizeUserType,
   isValidCpf,
   validateRegistration,
   validateLogin,

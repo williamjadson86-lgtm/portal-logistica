@@ -81,8 +81,10 @@ async function create(req, res) {
       tamanhoBytes: req.file ? req.file.size : null,
     });
     await eventRepository.appendEvent({
+      actor: req.user,
       entregaId: comprovante.entregaId,
       usuarioId: req.user?.id || null,
+      empresaId: req.user?.empresaId || null,
       tipoEvento: "comprovante_enviado",
       descricao: `Comprovante ${comprovante.tipo} enviado para a entrega ${comprovante.codigoEntrega}`,
       dados: {
@@ -140,8 +142,10 @@ async function remove(req, res) {
   }
 
   await eventRepository.appendEvent({
+    actor: req.user,
     entregaId: proof.entregaId,
     usuarioId: req.user?.id || null,
+    empresaId: req.user?.empresaId || null,
     tipoEvento: "comprovante_inativado",
     descricao: `Comprovante ${proof.tipo} inativado na entrega ${proof.codigoEntrega}`,
     dados: {

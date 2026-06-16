@@ -23,7 +23,9 @@ async function requestJson(url, options = {}) {
   if (!response.ok) {
     const details = body?.detalhes?.join(", ");
     const message = details || body?.erro || "Nao foi possivel concluir a solicitacao.";
-    throw new Error(message);
+    const error = new Error(message);
+    error.statusCode = response.status;
+    throw error;
   }
 
   return body;
@@ -468,6 +470,40 @@ function renderDashboardFleet(data) {
   `;
 }
 
+function renderDashboardRestrictedState(message) {
+  const metricsGrid = document.querySelector("[data-dashboard-grid]");
+  const alerts = document.querySelector("[data-dashboard-alerts]");
+  const productivity = document.querySelector("[data-dashboard-productivity]");
+  const fleetMetrics = document.querySelector("[data-dashboard-fleet-metrics]");
+  const fleetRanking = document.querySelector("[data-dashboard-fleet-ranking]");
+  const content = `
+    <article class="data-card empty">
+      <strong>Sem permissao para o dashboard</strong>
+      <p>${message}</p>
+    </article>
+  `;
+
+  if (metricsGrid) {
+    metricsGrid.innerHTML = content;
+  }
+
+  if (alerts) {
+    alerts.innerHTML = content;
+  }
+
+  if (productivity) {
+    productivity.innerHTML = content;
+  }
+
+  if (fleetMetrics) {
+    fleetMetrics.innerHTML = content;
+  }
+
+  if (fleetRanking) {
+    fleetRanking.innerHTML = content;
+  }
+}
+
 function formatPeriodLabel(filter) {
   const labels = {
     hoje: "Hoje",
@@ -538,15 +574,22 @@ async function loadHome() {
       loading.hidden = false;
       setMessage(message, "", "");
 
-      const [portalData, dashboardData] = await Promise.all([
-        requestJson("/api/portal/home"),
-        requestJson(buildDashboardUrl(filters)),
-      ]);
+      const portalData = await requestJson("/api/portal/home");
 
       welcome.textContent = portalData.usuario.nome.split(" ")[0];
       role.textContent = portalData.usuario.tipoUsuario;
       matricula.textContent = portalData.usuario.matricula;
       renderCards(portalData.cards);
+
+      if (!portalData.acesso?.dashboard) {
+        renderDashboardRestrictedState(
+          "Seu perfil atual nao possui acesso a este modulo. Os cards disponiveis continuam acessiveis abaixo.",
+        );
+        periodLabel.textContent = "Dashboard indisponivel para este perfil";
+        return;
+      }
+
+      const dashboardData = await requestJson(buildDashboardUrl(filters));
       renderDashboardMetrics(dashboardData);
       renderDashboardAlerts(dashboardData);
       renderDashboardProductivity(dashboardData);
@@ -559,6 +602,10 @@ async function loadHome() {
       ) {
         window.location.href = "/login";
         return;
+      }
+
+      if (error.statusCode === 403) {
+        renderDashboardRestrictedState(error.message);
       }
 
       setMessage(message, "error", error.message);
@@ -672,6 +719,11 @@ async function loadModulePage() {
     renderHighlights(data.destaques);
     renderItems(data.itens);
   } catch (_error) {
+    if (_error.statusCode === 403) {
+      window.location.href = "/acesso-negado";
+      return;
+    }
+
     window.location.href = "/login";
   }
 }

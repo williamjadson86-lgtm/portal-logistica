@@ -2,7 +2,11 @@ const jwt = require("jsonwebtoken");
 const env = require("../config/env");
 const HttpError = require("../errors/HttpError");
 const repository = require("../repositories/userRepository");
-const { hasPermission } = require("../config/permissions");
+const {
+  hasPermission,
+  listPermissionsForUser,
+  normalizeUserRole,
+} = require("../config/permissions");
 
 function extractToken(req) {
   const authorization = req.headers.authorization;
@@ -20,6 +24,23 @@ function redirectForbidden(res, permission) {
     : "";
 
   return res.redirect(`/acesso-negado${query}`);
+}
+
+function enrichUserContext(user) {
+  const role = normalizeUserRole(user);
+
+  return {
+    ...user,
+    tipoUsuario: role || user.tipoUsuario || null,
+    perfil: role || user.tipoUsuario || null,
+    role: role || user.tipoUsuario || null,
+    empresaId: user.empresaId || user.empresa_id || null,
+    empresa_id: user.empresaId || user.empresa_id || null,
+    permissions: listPermissionsForUser({
+      ...user,
+      tipoUsuario: role || user.tipoUsuario || null,
+    }),
+  };
 }
 
 function authMiddleware(options = {}) {
@@ -44,7 +65,9 @@ function authMiddleware(options = {}) {
         throw new HttpError(401, "Sessao invalida");
       }
 
-      if (!hasPermission(user, permission)) {
+      const enrichedUser = enrichUserContext(user);
+
+      if (!hasPermission(enrichedUser, permission)) {
         if (api) {
           return next(new HttpError(403, "Acesso negado para o perfil atual"));
         }
@@ -52,7 +75,7 @@ function authMiddleware(options = {}) {
         return redirectForbidden(res, permission);
       }
 
-      req.user = user;
+      req.user = enrichedUser;
       return next();
     } catch (error) {
       if (error instanceof HttpError && error.statusCode === 403) {

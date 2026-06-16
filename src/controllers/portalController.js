@@ -3,7 +3,12 @@ const env = require("../config/env");
 const deliveryRepository = require("../repositories/deliveryRepository");
 const routePlanningRepository = require("../repositories/routePlanningRepository");
 const resolveView = require("../utils/viewResolver");
-const { PERMISSIONS, hasPermission, filterCardsForUser } = require("../config/permissions");
+const {
+  PERMISSIONS,
+  hasPermission,
+  filterCardsForUser,
+  listPermissionsForUser,
+} = require("../config/permissions");
 
 const cards = [
   {
@@ -163,6 +168,13 @@ async function homeData(req, res) {
       rotasPlanejadas: routeDashboard.planejadas,
       rotasEmAndamento: routeDashboard.emAndamento,
       rotasConcluidas: routeDashboard.concluidas,
+    },
+    permissoes: listPermissionsForUser(req.user),
+    acesso: {
+      dashboard: hasPermission(req.user, PERMISSIONS.DASHBOARD_VIEW),
+      relatorios: hasPermission(req.user, PERMISSIONS.REPORTS_VIEW),
+      financeiro: hasPermission(req.user, PERMISSIONS.FINANCE_VIEW),
+      configuracoes: hasPermission(req.user, PERMISSIONS.SETTINGS_VIEW),
     },
     cards: filterCardsForUser(cards, req.user),
   });

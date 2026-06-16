@@ -5,6 +5,7 @@ const path = require("path");
 const database = require("../src/config/database");
 const clientRepository = require("../src/repositories/clientRepository");
 const deliveryRepository = require("../src/repositories/deliveryRepository");
+const deliveryEventRepository = require("../src/repositories/deliveryEventRepository");
 const financeRepository = require("../src/repositories/financeRepository");
 const { findLinkedDriverId } = require("../src/repositories/driverAccessRepository");
 
@@ -106,6 +107,72 @@ test("repositorios ainda funcionam em fallback quando empresaId nao existe", asy
   assert.doesNotMatch(captured.sql, /empresa_id =/);
   assert.match(captured.sql, /c\.usuario_id = \$1/);
   assert.deepEqual(captured.params, ["user-legacy"]);
+});
+
+test("eventos de entrega herdam empresa_id do ator autenticado", async () => {
+  const calls = [];
+  useQuerySpy(async (sql, params) => {
+    calls.push({ sql, params });
+
+    if (calls.length === 1) {
+      return { rowCount: 1, rows: [{ id: "entrega-001" }] };
+    }
+
+    return {
+      rows: [
+        {
+          id: "evento-001",
+          entregaId: "entrega-001",
+          usuarioId: "user-evt",
+          tipoEvento: "teste",
+          descricao: "Evento de teste",
+          dados: null,
+          criadoEm: "2026-06-16T00:00:00.000Z",
+        },
+      ],
+    };
+  });
+
+  const result = await deliveryEventRepository.appendEvent(
+    { id: "user-evt", empresaId: "empresa-evt" },
+    {
+      entregaId: "entrega-001",
+      tipoEvento: "teste",
+      descricao: "Evento de teste",
+    },
+  );
+
+  assert.equal(result.usuarioId, "user-evt");
+  assert.match(calls[0].sql, /d\.empresa_id = \$1/);
+  assert.deepEqual(calls[0].params, ["empresa-evt", "user-evt", "entrega-001"]);
+  assert.equal(calls[1].params[2], "empresa-evt");
+});
+
+test("apoio financeiro verifica lancamentos ativos no mesmo tenant", async () => {
+  const calls = [];
+  useQuerySpy(async (sql, params) => {
+    calls.push({ sql, params });
+
+    if (calls.length === 1) {
+      return { rows: [] };
+    }
+
+    return { rows: [] };
+  });
+
+  await financeRepository.listSupportData({
+    id: "user-005",
+    empresaId: "empresa-005",
+  });
+
+  assert.match(calls[1].sql, /lf\.empresa_id = \$3/);
+  assert.match(calls[1].sql, /lf\.empresa_id IS NULL AND lf\.usuario_id = \$4/);
+  assert.deepEqual(calls[1].params, [
+    "empresa-005",
+    "user-005",
+    "empresa-005",
+    "user-005",
+  ]);
 });
 
 test("migration 011 cria empresas e adiciona colunas de tenancy", () => {

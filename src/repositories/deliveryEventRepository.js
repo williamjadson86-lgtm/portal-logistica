@@ -1,4 +1,5 @@
 const database = require("../config/database");
+const HttpError = require("../errors/HttpError");
 const { buildTenantCondition, normalizeActor } = require("./tenantContext");
 
 function mapEvent(row) {
@@ -18,7 +19,50 @@ function mapEvent(row) {
   };
 }
 
-async function appendEvent(event, client = database) {
+async function ensureDeliveryAccess(actor, entregaId, client = database) {
+  const tenant = buildTenantCondition({ actor, tableAlias: "d" });
+  const deliveryIdIndex = tenant.nextIndex;
+  const result = await client.query(
+    `SELECT id
+    FROM entregas d
+    WHERE ${tenant.condition}
+      AND d.id = $${deliveryIdIndex}`,
+    [...tenant.params, entregaId],
+  );
+
+  if (result.rowCount === 0) {
+    throw new HttpError(404, "Entrega nao encontrada para registrar evento");
+  }
+}
+
+function resolveAppendEventArgs(actorOrEvent, maybeEvent, maybeClient) {
+  if (maybeEvent) {
+    return {
+      actor: actorOrEvent,
+      event: maybeEvent,
+      client: maybeClient || database,
+    };
+  }
+
+  return {
+    actor: actorOrEvent?.actor || {
+      id: actorOrEvent?.usuarioId || null,
+      empresaId: actorOrEvent?.empresaId || null,
+      tipoUsuario: actorOrEvent?.tipoUsuario || actorOrEvent?.perfil || actorOrEvent?.role || null,
+    },
+    event: actorOrEvent,
+    client: maybeEvent || database,
+  };
+}
+
+async function appendEvent(actorOrEvent, maybeEvent, maybeClient = database) {
+  const { actor, event, client } = resolveAppendEventArgs(
+    actorOrEvent,
+    maybeEvent,
+    maybeClient,
+  );
+  const context = normalizeActor(actor);
+  await ensureDeliveryAccess(context, event.entregaId, client);
   const result = await client.query(
     `INSERT INTO entrega_eventos (
       entrega_id,
@@ -39,8 +83,8 @@ async function appendEvent(event, client = database) {
       criado_em AS "criadoEm"`,
     [
       event.entregaId,
-      event.usuarioId || null,
-      event.empresaId || null,
+      event.usuarioId || context.userId || null,
+      context.empresaId || event.empresaId || null,
       event.tipoEvento,
       event.descricao,
       event.dados ? JSON.stringify(event.dados) : null,
@@ -50,11 +94,14 @@ async function appendEvent(event, client = database) {
   return mapEvent(result.rows[0]);
 }
 
-async function appendMany(events, client = database) {
+async function appendMany(actorOrEvents, maybeEvents, maybeClient = database) {
+  const actor = Array.isArray(actorOrEvents) ? null : actorOrEvents;
+  const events = Array.isArray(actorOrEvents) ? actorOrEvents : maybeEvents;
+  const client = Array.isArray(actorOrEvents) ? maybeEvents || database : maybeClient;
   const created = [];
 
   for (const event of events) {
-    created.push(await appendEvent(event, client));
+    created.push(await appendEvent(actor || event.actor || event, event, client));
   }
 
   return created;

@@ -546,6 +546,11 @@ async function createFromDelivery(actor, deliveryId, payload = {}) {
 async function listSupportData(actor) {
   const clientTenant = buildTenantCondition({ actor, tableAlias: "clientes" });
   const deliveryTenant = buildTenantCondition({ actor, tableAlias: "e" });
+  const financialTenant = buildTenantCondition({
+    actor,
+    tableAlias: "lf",
+    startIndex: deliveryTenant.params.length + 1,
+  });
   const [clientsResult, deliveriesResult] = await Promise.all([
     database.query(
       `SELECT id, nome, documento, status
@@ -567,12 +572,13 @@ async function listSupportData(actor) {
           SELECT 1
           FROM lancamentos_financeiros lf
           WHERE lf.entrega_id = e.id
+            AND ${financialTenant.condition}
             AND lf.status <> 'cancelado'
         ) AS "temLancamentoAtivo"
       FROM entregas e
       WHERE ${deliveryTenant.condition}
       ORDER BY e.previsao_entrega DESC NULLS LAST, e.codigo ASC`,
-      deliveryTenant.params,
+      [...deliveryTenant.params, ...financialTenant.params],
     ),
   ]);
 

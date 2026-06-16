@@ -19,8 +19,8 @@ function normalizeActor(actor) {
 
   return {
     userId: actor.id || actor.userId || null,
-    empresaId: actor.empresaId || null,
-    tipoUsuario: actor.tipoUsuario || null,
+    empresaId: actor.empresaId || actor.empresa_id || null,
+    tipoUsuario: actor.tipoUsuario || actor.perfil || actor.role || null,
     cpf: actor.cpf || null,
   };
 }
