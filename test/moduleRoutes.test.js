@@ -143,6 +143,7 @@ test("home api retorna dashboard de entregas autenticado", async () => {
   assert.equal(response.body.cards.length, 11);
   assert.ok(response.body.cards.some((card) => card.href === "/despesas-veiculos"));
   assert.ok(response.body.cards.some((card) => card.href === "/manutencoes-veiculos"));
+  assert.ok(response.body.cards.some((card) => card.href === "/relatorios"));
 });
 
 test("modulos html exigem autenticacao", async () => {

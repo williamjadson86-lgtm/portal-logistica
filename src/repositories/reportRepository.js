@@ -5,6 +5,7 @@ const driverRepository = require("./driverRepository");
 const fleetCostRepository = require("./fleetCostRepository");
 const financeRepository = require("./financeRepository");
 const proofRepository = require("./proofRepository");
+const vehicleMaintenanceRepository = require("./vehicleMaintenanceRepository");
 const vehicleRepository = require("./vehicleRepository");
 const { buildTenantCondition } = require("./tenantContext");
 
@@ -20,6 +21,10 @@ function matchesDateRange(value, start, end) {
   return value >= start && value <= end;
 }
 
+function todayText() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function mapClientFilter(client) {
   return {
     id: client.id,
@@ -29,9 +34,112 @@ function mapClientFilter(client) {
   };
 }
 
-async function listClientFilters(actor) {
-  const clients = await clientRepository.listByUserId(actor);
-  return clients.map(mapClientFilter);
+function mapVehicleFilter(vehicle) {
+  return {
+    id: vehicle.id,
+    placa: vehicle.placa,
+    modelo: vehicle.modelo,
+    status: vehicle.status,
+  };
+}
+
+function mapDriverFilter(driver) {
+  return {
+    id: driver.id,
+    nome: driver.nome,
+    status: driver.status,
+  };
+}
+
+async function listSupportData(actor) {
+  const [clients, vehicles, drivers] = await Promise.all([
+    clientRepository.listByUserId(actor),
+    vehicleRepository.listByUserId(actor),
+    driverRepository.listByUserId(actor),
+  ]);
+
+  return {
+    clientes: clients.map(mapClientFilter),
+    veiculos: vehicles.map(mapVehicleFilter),
+    motoristas: drivers.map(mapDriverFilter),
+  };
+}
+
+function filterDeliveries(deliveries, filters = {}) {
+  return deliveries.filter(
+    (delivery) =>
+      (!filters.clienteId || delivery.clienteId === filters.clienteId) &&
+      (!filters.status || delivery.status === filters.status) &&
+      matchesDateRange(
+        delivery.dataPrevista || delivery.criadoEm?.slice(0, 10),
+        filters.dataInicio,
+        filters.dataFim,
+      ),
+  );
+}
+
+function filterFinancialEntries(financialEntries, filters = {}) {
+  return financialEntries.filter(
+    (entry) =>
+      (!filters.clienteId || entry.clienteId === filters.clienteId) &&
+      (!filters.status || entry.status === filters.status) &&
+      (!filters.tipo || entry.tipo === filters.tipo) &&
+      matchesDateRange(entry.dataCompetencia, filters.dataInicio, filters.dataFim),
+  );
+}
+
+function filterFleetExpenses(expenses, filters = {}) {
+  return expenses.filter(
+    (expense) =>
+      (!filters.veiculoId || expense.veiculoId === filters.veiculoId) &&
+      (!filters.motoristaId || expense.motoristaId === filters.motoristaId) &&
+      (!filters.status || expense.status === filters.status) &&
+      (!filters.tipo || expense.tipo === filters.tipo) &&
+      matchesDateRange(expense.dataDespesa, filters.dataInicio, filters.dataFim),
+  );
+}
+
+function filterMaintenances(maintenances, filters = {}) {
+  return maintenances.filter(
+    (maintenance) =>
+      (!filters.veiculoId || maintenance.veiculoId === filters.veiculoId) &&
+      (!filters.status || maintenance.status === filters.status) &&
+      (!filters.tipo || String(maintenance.tipo).toLowerCase() === String(filters.tipo).toLowerCase()) &&
+      matchesDateRange(maintenance.dataManutencao, filters.dataInicio, filters.dataFim),
+  );
+}
+
+function buildDeliveriesSummary(deliveries) {
+  const byStatus = deliveries.reduce((accumulator, delivery) => {
+    accumulator[delivery.status] = (accumulator[delivery.status] || 0) + 1;
+    return accumulator;
+  }, {});
+
+  const byRegionMap = deliveries.reduce((accumulator, delivery) => {
+    const key = `${delivery.cidade || "Sem cidade"}|${delivery.estado || "--"}`;
+    const current = accumulator.get(key) || {
+      cidade: delivery.cidade || "Sem cidade",
+      estado: delivery.estado || "--",
+      total: 0,
+      pendentes: 0,
+      entregues: 0,
+    };
+    current.total += 1;
+    if (delivery.status === "pendente") {
+      current.pendentes += 1;
+    }
+    if (delivery.status === "entregue") {
+      current.entregues += 1;
+    }
+    accumulator.set(key, current);
+    return accumulator;
+  }, new Map());
+
+  return {
+    totalEntregas: deliveries.length,
+    porStatus: byStatus,
+    porCidadeEstado: [...byRegionMap.values()].sort((left, right) => right.total - left.total),
+  };
 }
 
 async function listByClient(actor, filters) {
@@ -49,6 +157,18 @@ async function listByClient(actor, filters) {
   const selectedClients = clients.filter(
     (client) => !filters.clienteId || client.id === filters.clienteId,
   );
+  const filteredDeliveries = filterDeliveries(deliveries, {
+    clienteId: filters.clienteId,
+    status: filters.statusEntrega,
+    dataInicio: filters.dataInicio,
+    dataFim: filters.dataFim,
+  });
+  const filteredFinancialEntries = filterFinancialEntries(financialEntries, {
+    clienteId: filters.clienteId,
+    status: filters.statusFinanceiro,
+    dataInicio: filters.dataInicio,
+    dataFim: filters.dataFim,
+  });
   const proofsByDelivery = new Map();
 
   for (const proof of proofs) {
@@ -59,21 +179,10 @@ async function listByClient(actor, filters) {
   }
 
   const rows = selectedClients.map((client) => {
-    const clientDeliveries = deliveries.filter(
-      (delivery) =>
-        delivery.clienteId === client.id &&
-        matchesDateRange(
-          delivery.dataPrevista || delivery.criadoEm?.slice(0, 10),
-          filters.dataInicio,
-          filters.dataFim,
-        ) &&
-        (!filters.statusEntrega || delivery.status === filters.statusEntrega),
-    );
+    const clientDeliveries = filteredDeliveries.filter((delivery) => delivery.clienteId === client.id);
     const deliveryIds = new Set(clientDeliveries.map((delivery) => delivery.id));
-    const clientFinancialEntries = financialEntries.filter(
-      (entry) =>
-        entry.clienteId === client.id ||
-        (entry.entregaId && deliveryIds.has(entry.entregaId)),
+    const clientFinancialEntries = filteredFinancialEntries.filter(
+      (entry) => entry.clienteId === client.id || (entry.entregaId && deliveryIds.has(entry.entregaId)),
     );
     const totalComprovantes = clientDeliveries.reduce(
       (sum, delivery) => sum + Number(proofsByDelivery.get(delivery.id) || 0),
@@ -92,7 +201,7 @@ async function listByClient(actor, filters) {
       (entry) =>
         ["pendente", "faturado"].includes(entry.status) &&
         entry.dataVencimento &&
-        entry.dataVencimento < new Date().toISOString().slice(0, 10),
+        entry.dataVencimento < todayText(),
     ).length;
 
     return {
@@ -183,7 +292,7 @@ async function getClientReportDetails(actor, clientId) {
         (entry) =>
           ["pendente", "faturado"].includes(entry.status) &&
           entry.dataVencimento &&
-          entry.dataVencimento < new Date().toISOString().slice(0, 10),
+          entry.dataVencimento < todayText(),
       ).length,
     },
     entregasRecentes: clientDeliveries,
@@ -222,40 +331,95 @@ async function listLatestRouteAssignments(actor, deliveryIds) {
   return result.rows;
 }
 
-async function getFleetCostReport(actor, filters) {
-  const [deliveries, financialEntries, vehicleExpenses, vehicles, drivers] = await Promise.all([
+async function getDeliveriesReport(actor, filters) {
+  const [deliveries, support] = await Promise.all([
     deliveryRepository.listByUserId(actor),
+    listSupportData(actor),
+  ]);
+  const filtered = filterDeliveries(deliveries, filters);
+  const summary = buildDeliveriesSummary(filtered);
+
+  return {
+    filtros: filters,
+    resumo: summary,
+    entregas: filtered,
+    apoio: support,
+  };
+}
+
+async function getFinancialReport(actor, filters) {
+  const [financialEntries, support] = await Promise.all([
     financeRepository.listByUserId(actor, {
       dataInicio: filters.dataInicio,
       dataFim: filters.dataFim,
-      status: filters.statusFinanceiro,
     }),
-    fleetCostRepository.listByUserId(actor, {
-      dataInicio: filters.dataInicio,
-      dataFim: filters.dataFim,
-      status: filters.statusFinanceiro,
-    }),
-    vehicleRepository.listByUserId(actor),
-    driverRepository.listByUserId(actor),
+    listSupportData(actor),
   ]);
+  const filtered = filterFinancialEntries(financialEntries, filters);
+  const receitaTotal = filtered
+    .filter((entry) => entry.tipo === "receita" && entry.status !== "cancelado")
+    .reduce((sum, entry) => sum + entry.valor, 0);
+  const despesaTotal = filtered
+    .filter((entry) => ["despesa", "repasse"].includes(entry.tipo) && entry.status !== "cancelado")
+    .reduce((sum, entry) => sum + entry.valor, 0);
+  const porStatus = filtered.reduce((accumulator, entry) => {
+    accumulator[entry.status] = Number(((accumulator[entry.status] || 0) + entry.valor).toFixed(2));
+    return accumulator;
+  }, {});
+  const porTipo = filtered.reduce((accumulator, entry) => {
+    accumulator[entry.tipo] = Number(((accumulator[entry.tipo] || 0) + entry.valor).toFixed(2));
+    return accumulator;
+  }, {});
 
-  const filteredDeliveries = deliveries.filter(
-    (delivery) =>
-      matchesDateRange(
-        delivery.dataPrevista || delivery.criadoEm?.slice(0, 10),
-        filters.dataInicio,
-        filters.dataFim,
-      ) &&
-      (!filters.clienteId || delivery.clienteId === filters.clienteId) &&
-      (!filters.statusEntrega || delivery.status === filters.statusEntrega),
-  );
+  return {
+    filtros: filters,
+    resumo: {
+      totalLancamentos: filtered.length,
+      receitaTotal: Number(receitaTotal.toFixed(2)),
+      despesaTotal: Number(despesaTotal.toFixed(2)),
+      resultadoFinanceiro: Number((receitaTotal - despesaTotal).toFixed(2)),
+      porStatus,
+      porTipo,
+    },
+    lancamentos: filtered,
+    apoio: support,
+  };
+}
+
+async function getFleetReport(actor, filters) {
+  const [deliveries, financialEntries, vehicleExpenses, vehicles, drivers, maintenances, support] =
+    await Promise.all([
+      deliveryRepository.listByUserId(actor),
+      financeRepository.listByUserId(actor, {
+        dataInicio: filters.dataInicio,
+        dataFim: filters.dataFim,
+      }),
+      fleetCostRepository.listByUserId(actor, {
+        dataInicio: filters.dataInicio,
+        dataFim: filters.dataFim,
+        ativo: true,
+      }),
+      vehicleRepository.listByUserId(actor),
+      driverRepository.listByUserId(actor),
+      vehicleMaintenanceRepository.listByUserId(actor, {
+        dataInicio: filters.dataInicio,
+        dataFim: filters.dataFim,
+        ativo: true,
+      }),
+      listSupportData(actor),
+    ]);
+
+  const filteredDeliveries = filterDeliveries(deliveries, filters);
+  const filteredFinancialEntries = filterFinancialEntries(financialEntries, filters);
+  const filteredExpenses = filterFleetExpenses(vehicleExpenses, filters);
+  const filteredMaintenances = filterMaintenances(maintenances, filters);
   const deliveryIds = filteredDeliveries.map((delivery) => delivery.id);
   const assignments = await listLatestRouteAssignments(actor, deliveryIds);
   const assignmentByDeliveryId = new Map(assignments.map((item) => [item.entregaId, item]));
   const vehicleIdsInScope = new Set(assignments.map((item) => item.veiculoId).filter(Boolean));
   const driverIdsInScope = new Set(assignments.map((item) => item.motoristaId).filter(Boolean));
 
-  const operationalRevenueEntries = financialEntries.filter(
+  const operationalRevenueEntries = filteredFinancialEntries.filter(
     (entry) =>
       entry.tipo === "receita" &&
       entry.status !== "cancelado" &&
@@ -264,13 +428,13 @@ async function getFleetCostReport(actor, filters) {
   );
 
   const scopedExpenses =
-    filters.clienteId || filters.statusEntrega
-      ? vehicleExpenses.filter(
+    filters.clienteId || filters.status
+      ? filteredExpenses.filter(
           (expense) =>
             vehicleIdsInScope.has(expense.veiculoId) ||
             (expense.motoristaId && driverIdsInScope.has(expense.motoristaId)),
         )
-      : vehicleExpenses;
+      : filteredExpenses;
 
   const vehicleMap = new Map(
     vehicles.map((vehicle) => [
@@ -283,6 +447,8 @@ async function getFleetCostReport(actor, filters) {
         totalEntregas: 0,
         receitaTotal: 0,
         despesaTotal: 0,
+        totalManutencoes: 0,
+        custoManutencao: 0,
         lucro: 0,
         margem: 0,
       },
@@ -334,18 +500,20 @@ async function getFleetCostReport(actor, filters) {
     }
   }
 
-  const scopedVehicleIds =
-    filters.clienteId || filters.statusEntrega ? vehicleIdsInScope : new Set(vehicles.map((item) => item.id));
-  const scopedDriverIds =
-    filters.clienteId || filters.statusEntrega ? driverIdsInScope : new Set(drivers.map((item) => item.id));
-
   for (const expense of scopedExpenses) {
-    if (expense.veiculoId && vehicleMap.has(expense.veiculoId) && scopedVehicleIds.has(expense.veiculoId)) {
+    if (expense.veiculoId && vehicleMap.has(expense.veiculoId)) {
       vehicleMap.get(expense.veiculoId).despesaTotal += expense.valor;
     }
 
-    if (expense.motoristaId && driverMap.has(expense.motoristaId) && scopedDriverIds.has(expense.motoristaId)) {
+    if (expense.motoristaId && driverMap.has(expense.motoristaId)) {
       driverMap.get(expense.motoristaId).despesaTotal += expense.valor;
+    }
+  }
+
+  for (const maintenance of filteredMaintenances) {
+    if (maintenance.veiculoId && vehicleMap.has(maintenance.veiculoId)) {
+      vehicleMap.get(maintenance.veiculoId).totalManutencoes += 1;
+      vehicleMap.get(maintenance.veiculoId).custoManutencao += maintenance.custo;
     }
   }
 
@@ -362,11 +530,18 @@ async function getFleetCostReport(actor, filters) {
       margem,
       resultadoLiquido: lucro,
       rentabilidade: margem,
+      custoManutencao: Number((item.custoManutencao || 0).toFixed(2)),
     };
   };
 
   const vehicleRows = [...vehicleMap.values()]
-    .filter((item) => item.totalEntregas > 0 || item.receitaTotal > 0 || item.despesaTotal > 0)
+    .filter(
+      (item) =>
+        item.totalEntregas > 0 ||
+        item.receitaTotal > 0 ||
+        item.despesaTotal > 0 ||
+        item.totalManutencoes > 0,
+    )
     .map(finalize)
     .sort((left, right) => right.lucro - left.lucro);
   const driverRows = [...driverMap.values()]
@@ -384,8 +559,27 @@ async function getFleetCostReport(actor, filters) {
     accumulator[expense.tipo] = Number(((accumulator[expense.tipo] || 0) + expense.valor).toFixed(2));
     return accumulator;
   }, {});
+  const despesasPorStatus = scopedExpenses.reduce((accumulator, expense) => {
+    accumulator[expense.status] = Number(((accumulator[expense.status] || 0) + expense.valor).toFixed(2));
+    return accumulator;
+  }, {});
+  const manutencoesPorVeiculo = filteredMaintenances.reduce((accumulator, maintenance) => {
+    const key = maintenance.veiculoId || "sem-veiculo";
+    const current = accumulator.get(key) || {
+      veiculoId: maintenance.veiculoId,
+      placa: maintenance.veiculo?.placa || "Sem placa",
+      modelo: maintenance.veiculo?.modelo || "Sem modelo",
+      totalManutencoes: 0,
+      custoTotal: 0,
+    };
+    current.totalManutencoes += 1;
+    current.custoTotal += maintenance.custo;
+    accumulator.set(key, current);
+    return accumulator;
+  }, new Map());
 
   return {
+    filtros: filters,
     resumo: {
       totalEntregasRentaveis: filteredDeliveries.length,
       totalVeiculosComMovimento: vehicleRows.length,
@@ -397,26 +591,74 @@ async function getFleetCostReport(actor, filters) {
       margemOperacional,
       lancamentosVencidos: scopedExpenses.filter(
         (expense) =>
-          ["pendente", "faturado"].includes(expense.status) &&
+          expense.status === "pendente" &&
           expense.dataVencimento &&
-          expense.dataVencimento < new Date().toISOString().slice(0, 10),
+          expense.dataVencimento < todayText(),
       ).length,
       custosPorTipo,
+      despesasPorStatus,
     },
     veiculos: vehicleRows,
     motoristas: driverRows,
+    manutencoesPorVeiculo: [...manutencoesPorVeiculo.values()].map((item) => ({
+      ...item,
+      custoTotal: Number(item.custoTotal.toFixed(2)),
+    })),
+    despesas: scopedExpenses,
     ranking: {
       topVeiculosLucratividade: vehicleRows.slice(0, 5),
       topMotoristasLucratividade: driverRows.slice(0, 5),
-      maioresDespesas: [...scopedExpenses]
-        .sort((left, right) => right.valor - left.valor)
-        .slice(0, 5),
+      maioresDespesas: [...scopedExpenses].sort((left, right) => right.valor - left.valor).slice(0, 5),
+      custosPorVeiculo: [...vehicleRows].sort((left, right) => right.despesaTotal - left.despesaTotal).slice(0, 10),
     },
+    apoio: support,
+  };
+}
+
+async function getFleetCostReport(actor, filters) {
+  return getFleetReport(actor, filters);
+}
+
+async function getSummaryReport(actor, filters) {
+  const [deliveriesReport, financialReport, fleetReport, support] = await Promise.all([
+    getDeliveriesReport(actor, filters),
+    getFinancialReport(actor, filters),
+    getFleetReport(actor, filters),
+    listSupportData(actor),
+  ]);
+
+  return {
+    filtros: filters,
+    resumo: {
+      totalEntregas: deliveriesReport.resumo.totalEntregas,
+      receitaTotal: financialReport.resumo.receitaTotal,
+      despesaTotal: Number(
+        (financialReport.resumo.despesaTotal + fleetReport.resumo.despesaTotal).toFixed(2),
+      ),
+      resultadoFinanceiro: Number(
+        (
+          financialReport.resumo.receitaTotal -
+          (financialReport.resumo.despesaTotal + fleetReport.resumo.despesaTotal)
+        ).toFixed(2),
+      ),
+      entregasPorStatus: deliveriesReport.resumo.porStatus,
+      lancamentosPorStatus: financialReport.resumo.porStatus,
+      despesasVeiculosPorStatus: fleetReport.resumo.despesasPorStatus,
+    },
+    entregas: deliveriesReport.resumo,
+    financeiro: financialReport.resumo,
+    frota: fleetReport.resumo,
+    apoio: support,
   };
 }
 
 module.exports = {
+  listSupportData,
   listByClient,
   getClientReportDetails,
+  getDeliveriesReport,
+  getFinancialReport,
+  getFleetReport,
   getFleetCostReport,
+  getSummaryReport,
 };

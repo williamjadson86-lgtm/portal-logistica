@@ -1,5 +1,11 @@
 const { DELIVERY_STATUSES, isValidUuid } = require("./deliveryValidation");
-const { FINANCIAL_STATUSES } = require("./financialValidation");
+const { FINANCIAL_STATUSES, FINANCIAL_TYPES } = require("./financialValidation");
+const { VEHICLE_EXPENSE_TYPES } = require("./fleetCostValidation");
+
+const REPORT_EXPORT_TYPES = ["resumo", "entregas", "financeiro", "frota"];
+const REPORT_EXPORT_FORMATS = ["csv", "xlsx"];
+const REPORT_STATUSES = [...new Set([...DELIVERY_STATUSES, ...FINANCIAL_STATUSES, "agendada", "em_execucao", "concluida"])];
+const REPORT_TYPES = [...new Set([...FINANCIAL_TYPES, ...VEHICLE_EXPENSE_TYPES, "preventiva", "corretiva"])];
 
 function parseOptionalText(value) {
   if (value == null || value === "") {
@@ -7,6 +13,16 @@ function parseOptionalText(value) {
   }
 
   return String(value).trim();
+}
+
+function readFirst(input, keys) {
+  for (const key of keys) {
+    if (Object.hasOwn(input, key)) {
+      return input[key];
+    }
+  }
+
+  return undefined;
 }
 
 function isValidDate(value) {
@@ -18,11 +34,12 @@ function isValidDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function validateClientReportFilters(input) {
+function validateCommonReportFilters(input, options = {}) {
+  const { skipTipoField = false } = options;
   const errors = [];
   const data = {};
 
-  const clienteId = parseOptionalText(input.clienteId);
+  const clienteId = parseOptionalText(readFirst(input, ["clienteId", "cliente_id"]));
   if (clienteId !== null) {
     if (!isValidUuid(clienteId)) {
       errors.push("clienteId invalido");
@@ -33,8 +50,30 @@ function validateClientReportFilters(input) {
     data.clienteId = null;
   }
 
-  const dataInicio = parseOptionalText(input.dataInicio);
-  const dataFim = parseOptionalText(input.dataFim);
+  const veiculoId = parseOptionalText(readFirst(input, ["veiculoId", "veiculo_id"]));
+  if (veiculoId !== null) {
+    if (!isValidUuid(veiculoId)) {
+      errors.push("veiculoId invalido");
+    } else {
+      data.veiculoId = veiculoId;
+    }
+  } else {
+    data.veiculoId = null;
+  }
+
+  const motoristaId = parseOptionalText(readFirst(input, ["motoristaId", "motorista_id"]));
+  if (motoristaId !== null) {
+    if (!isValidUuid(motoristaId)) {
+      errors.push("motoristaId invalido");
+    } else {
+      data.motoristaId = motoristaId;
+    }
+  } else {
+    data.motoristaId = null;
+  }
+
+  const dataInicio = parseOptionalText(readFirst(input, ["dataInicio", "data_inicio"]));
+  const dataFim = parseOptionalText(readFirst(input, ["dataFim", "data_fim"]));
 
   if ((dataInicio && !dataFim) || (!dataInicio && dataFim)) {
     errors.push("dataInicio e dataFim devem ser informadas em conjunto");
@@ -55,31 +94,66 @@ function validateClientReportFilters(input) {
   data.dataInicio = dataInicio;
   data.dataFim = dataFim;
 
-  const statusEntrega = parseOptionalText(input.statusEntrega);
-  if (statusEntrega !== null) {
-    if (!DELIVERY_STATUSES.includes(statusEntrega)) {
-      errors.push("statusEntrega invalido");
+  const status = parseOptionalText(readFirst(input, ["status", "statusEntrega", "statusFinanceiro"]));
+  if (status !== null) {
+    if (!REPORT_STATUSES.includes(status)) {
+      errors.push("status invalido");
     } else {
-      data.statusEntrega = statusEntrega;
+      data.status = status;
     }
   } else {
-    data.statusEntrega = null;
+    data.status = null;
   }
 
-  const statusFinanceiro = parseOptionalText(input.statusFinanceiro);
-  if (statusFinanceiro !== null) {
-    if (!FINANCIAL_STATUSES.includes(statusFinanceiro)) {
-      errors.push("statusFinanceiro invalido");
-    } else {
-      data.statusFinanceiro = statusFinanceiro;
-    }
+  if (skipTipoField) {
+    data.tipo = null;
   } else {
-    data.statusFinanceiro = null;
+    const tipo = parseOptionalText(readFirst(input, ["tipo", "tipoRelatorio"]));
+    if (tipo !== null) {
+      if (!REPORT_TYPES.includes(tipo)) {
+        errors.push("tipo invalido");
+      } else {
+        data.tipo = tipo;
+      }
+    } else {
+      data.tipo = null;
+    }
+  }
+
+  return { errors, data };
+}
+
+function validateClientReportFilters(input) {
+  const { errors, data } = validateCommonReportFilters(input);
+  data.statusEntrega = data.status && DELIVERY_STATUSES.includes(data.status) ? data.status : null;
+  data.statusFinanceiro = data.status && FINANCIAL_STATUSES.includes(data.status) ? data.status : null;
+  return { errors, data };
+}
+
+function validateReportExport(input) {
+  const { errors, data } = validateCommonReportFilters(input, { skipTipoField: true });
+  const tipo = parseOptionalText(input.tipo);
+  const formato = parseOptionalText(input.formato);
+
+  if (!REPORT_EXPORT_TYPES.includes(tipo || "")) {
+    errors.push("tipo de exportacao invalido");
+  } else {
+    data.tipoExportacao = tipo;
+  }
+
+  if (!REPORT_EXPORT_FORMATS.includes(formato || "")) {
+    errors.push("formato invalido");
+  } else {
+    data.formato = formato;
   }
 
   return { errors, data };
 }
 
 module.exports = {
+  REPORT_EXPORT_TYPES,
+  REPORT_EXPORT_FORMATS,
+  validateCommonReportFilters,
   validateClientReportFilters,
+  validateReportExport,
 };

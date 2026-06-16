@@ -3,10 +3,70 @@ const reportRepository = require("../repositories/reportRepository");
 const HttpError = require("../errors/HttpError");
 const resolveView = require("../utils/viewResolver");
 const { isValidUuid } = require("../validations/deliveryValidation");
-const { validateClientReportFilters } = require("../validations/reportValidation");
+const {
+  validateClientReportFilters,
+  validateCommonReportFilters,
+  validateReportExport,
+} = require("../validations/reportValidation");
 
 function page(_req, res) {
   res.sendFile(resolveView("relatorios.html"));
+}
+
+function escapeCsvCell(value) {
+  if (value == null) {
+    return "";
+  }
+
+  const normalized = String(value).replace(/\r?\n/g, " ");
+  if (/[",\n]/.test(normalized)) {
+    return `"${normalized.replace(/"/g, '""')}"`;
+  }
+
+  return normalized;
+}
+
+function buildRowsCsv(header, rows) {
+  return [header, ...rows]
+    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
+    .join("\n");
+}
+
+function formatPeriodLabel(filters) {
+  if (filters.dataInicio && filters.dataFim) {
+    return `${filters.dataInicio} ate ${filters.dataFim}`;
+  }
+
+  return "Sem periodo informado";
+}
+
+function applyWorksheetChrome(worksheet) {
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+  if (worksheet.rowCount > 0) {
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.eachCell((cell) => {
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+    });
+  }
+}
+
+function autoSizeColumns(worksheet, minimumWidth = 14) {
+  worksheet.columns.forEach((column) => {
+    let maxLength = minimumWidth;
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      const value = cell.value == null ? "" : String(cell.value);
+      maxLength = Math.max(maxLength, value.length + 2);
+    });
+    column.width = Math.min(maxLength, 40);
+  });
+}
+
+function applyCurrencyFormat(worksheet, columns) {
+  for (const columnIndex of columns) {
+    worksheet.getColumn(columnIndex).numFmt = '"R$" #,##0.00';
+  }
 }
 
 function buildOverallSummary(items) {
@@ -49,159 +109,71 @@ function buildRankings(items) {
   };
 }
 
-function buildGeneralAverageTicket(summary) {
-  if (!summary.totalEntregas) {
-    return 0;
-  }
-
-  return Number((summary.receitaTotal / summary.totalEntregas).toFixed(2));
-}
-
-function escapeCsvCell(value) {
-  if (value == null) {
-    return "";
-  }
-
-  const normalized = String(value).replace(/\r?\n/g, " ");
-  if (/[",\n]/.test(normalized)) {
-    return `"${normalized.replace(/"/g, '""')}"`;
-  }
-
-  return normalized;
-}
-
 function buildClientsCsv(items) {
-  const header = [
-    "cliente",
-    "documento",
-    "total de entregas",
-    "entregas pendentes",
-    "entregas em rota",
-    "entregas entregues",
-    "entregas canceladas",
-    "total de comprovantes",
-    "receita total",
-    "valor pendente",
-    "valor pago",
-    "lancamentos vencidos",
-    "ticket medio",
-  ];
-
-  const rows = items.map((item) => [
-    item.nome,
-    item.documento,
-    item.totalEntregas,
-    item.entregasPendentes,
-    item.entregasEmRota,
-    item.entregasEntregues,
-    item.entregasCanceladas,
-    item.totalComprovantes,
-    item.receitaTotal.toFixed(2),
-    item.valorPendente.toFixed(2),
-    item.valorPago.toFixed(2),
-    item.lancamentosVencidos,
-    item.ticketMedioPorEntrega.toFixed(2),
-  ]);
-
-  return [header, ...rows]
-    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
-    .join("\n");
+  return buildRowsCsv(
+    [
+      "cliente",
+      "documento",
+      "total de entregas",
+      "entregas pendentes",
+      "entregas em rota",
+      "entregas entregues",
+      "entregas canceladas",
+      "total de comprovantes",
+      "receita total",
+      "valor pendente",
+      "valor pago",
+      "lancamentos vencidos",
+      "ticket medio",
+    ],
+    items.map((item) => [
+      item.nome,
+      item.documento,
+      item.totalEntregas,
+      item.entregasPendentes,
+      item.entregasEmRota,
+      item.entregasEntregues,
+      item.entregasCanceladas,
+      item.totalComprovantes,
+      item.receitaTotal.toFixed(2),
+      item.valorPendente.toFixed(2),
+      item.valorPago.toFixed(2),
+      item.lancamentosVencidos,
+      item.ticketMedioPorEntrega.toFixed(2),
+    ]),
+  );
 }
 
-function buildExportFileName(filters) {
-  const suffix =
-    filters.dataInicio && filters.dataFim
-      ? `${filters.dataInicio}_${filters.dataFim}`
-      : new Date().toISOString().slice(0, 10);
-
-  return `relatorios_clientes_${suffix}.csv`;
+function buildDeliveriesCsv(report) {
+  return buildRowsCsv(
+    ["codigo", "cliente", "cidade", "estado", "status", "data prevista", "valor frete"],
+    report.entregas.map((item) => [
+      item.codigo,
+      item.cliente,
+      item.cidade,
+      item.estado,
+      item.status,
+      item.dataPrevista || "",
+      item.valorFrete != null ? Number(item.valorFrete).toFixed(2) : "",
+    ]),
+  );
 }
 
-function buildExportXlsxFileName(filters) {
-  const suffix =
-    filters.dataInicio && filters.dataFim
-      ? `${filters.dataInicio}_${filters.dataFim}`
-      : new Date().toISOString().slice(0, 10);
-
-  return `relatorios_clientes_${suffix}.xlsx`;
-}
-
-function buildFleetExportFileName(filters) {
-  const suffix =
-    filters.dataInicio && filters.dataFim
-      ? `${filters.dataInicio}_${filters.dataFim}`
-      : new Date().toISOString().slice(0, 10);
-
-  return `relatorios_frota_${suffix}.csv`;
-}
-
-function buildFleetExportXlsxFileName(filters) {
-  const suffix =
-    filters.dataInicio && filters.dataFim
-      ? `${filters.dataInicio}_${filters.dataFim}`
-      : new Date().toISOString().slice(0, 10);
-
-  return `relatorios_frota_${suffix}.xlsx`;
-}
-
-function formatPeriodLabel(filters) {
-  if (filters.dataInicio && filters.dataFim) {
-    return `${filters.dataInicio} ate ${filters.dataFim}`;
-  }
-
-  return "Sem periodo informado";
-}
-
-function applyWorksheetChrome(worksheet) {
-  worksheet.views = [{ state: "frozen", ySplit: 1 }];
-
-  if (worksheet.rowCount > 0) {
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true };
-    headerRow.eachCell((cell) => {
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-    });
-  }
-
-  if (worksheet.rowCount > 0 && worksheet.columnCount > 0) {
-    worksheet.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: 1, column: worksheet.columnCount },
-    };
-  }
-}
-
-function autoSizeColumns(worksheet, minimumWidth = 14) {
-  worksheet.columns.forEach((column) => {
-    let maxLength = minimumWidth;
-
-    column.eachCell({ includeEmpty: true }, (cell) => {
-      const value = cell.value == null ? "" : String(cell.value);
-      maxLength = Math.max(maxLength, value.length + 2);
-    });
-
-    column.width = Math.min(maxLength, 40);
-  });
-}
-
-function applyCurrencyFormat(worksheet, columns) {
-  for (const columnIndex of columns) {
-    worksheet.getColumn(columnIndex).numFmt = '"R$" #,##0.00';
-  }
-}
-
-function applyDateFormat(worksheet, columns) {
-  for (const columnIndex of columns) {
-    worksheet.getColumn(columnIndex).numFmt = "dd/mm/yyyy";
-  }
-}
-
-function parseExcelDate(value) {
-  if (!value) {
-    return null;
-  }
-
-  return new Date(`${value}T00:00:00`);
+function buildFinancialCsv(report) {
+  return buildRowsCsv(
+    ["descricao", "tipo", "status", "cliente", "entrega", "competencia", "vencimento", "pagamento", "valor"],
+    report.lancamentos.map((item) => [
+      item.descricao,
+      item.tipo,
+      item.status,
+      item.cliente?.nome || "",
+      item.entrega?.codigo || "",
+      item.dataCompetencia || "",
+      item.dataVencimento || "",
+      item.dataPagamento || "",
+      item.valor.toFixed(2),
+    ]),
+  );
 }
 
 function buildFleetCostsCsv(report) {
@@ -237,225 +209,123 @@ function buildFleetCostsCsv(report) {
     `${item.margem.toFixed(2)}%`,
   ]);
 
-  return [header, ...vehicleRows, ...driverRows]
-    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
-    .join("\n");
+  return buildRowsCsv(header, [...vehicleRows, ...driverRows]);
 }
 
-function createSummaryWorksheet(workbook, report) {
-  const worksheet = workbook.addWorksheet("Resumo");
-  worksheet.addRow(["Indicador", "Valor"]);
-  worksheet.addRows([
-    ["Periodo aplicado", formatPeriodLabel(report.filtros)],
-    ["Data inicial", parseExcelDate(report.filtros.dataInicio) || "Nao informada"],
-    ["Data final", parseExcelDate(report.filtros.dataFim) || "Nao informada"],
-    ["Total de clientes", report.resumo.totalClientes],
-    ["Receita total", report.resumo.receitaTotal],
-    ["Valor pendente", report.resumo.valorPendente],
-    ["Valor pago", report.resumo.valorPago],
-    ["Lancamentos vencidos", report.resumo.lancamentosVencidos],
-    ["Total de entregas", report.resumo.totalEntregas],
-    ["Ticket medio geral", buildGeneralAverageTicket(report.resumo)],
-  ]);
-
-  applyWorksheetChrome(worksheet);
-  worksheet.getCell("B3").numFmt = "dd/mm/yyyy";
-  worksheet.getCell("B4").numFmt = "dd/mm/yyyy";
-  worksheet.getCell("B6").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B7").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B8").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B11").numFmt = '"R$" #,##0.00';
-  autoSizeColumns(worksheet);
+function buildSummaryCsv(report) {
+  return buildRowsCsv(
+    ["indicador", "valor"],
+    [
+      ["periodo", formatPeriodLabel(report.filtros)],
+      ["total entregas", report.resumo.totalEntregas],
+      ["receita total", report.resumo.receitaTotal.toFixed(2)],
+      ["despesa total", report.resumo.despesaTotal.toFixed(2)],
+      ["resultado financeiro", report.resumo.resultadoFinanceiro.toFixed(2)],
+    ],
+  );
 }
 
-function createClientsWorksheet(workbook, report) {
-  const worksheet = workbook.addWorksheet("Clientes");
-  worksheet.addRow([
-    "Cliente",
-    "Documento",
-    "Total de entregas",
-    "Pendentes",
-    "Em rota",
-    "Entregues",
-    "Canceladas",
-    "Total de comprovantes",
-    "Receita total",
-    "Valor pendente",
-    "Valor pago",
-    "Lancamentos vencidos",
-    "Ticket medio",
-  ]);
-
-  report.clientes.forEach((item) => {
-    worksheet.addRow([
-      item.nome,
-      item.documento,
-      item.totalEntregas,
-      item.entregasPendentes,
-      item.entregasEmRota,
-      item.entregasEntregues,
-      item.entregasCanceladas,
-      item.totalComprovantes,
-      item.receitaTotal,
-      item.valorPendente,
-      item.valorPago,
-      item.lancamentosVencidos,
-      item.ticketMedioPorEntrega,
-    ]);
-  });
-
-  applyWorksheetChrome(worksheet);
-  applyCurrencyFormat(worksheet, [9, 10, 11, 13]);
-  autoSizeColumns(worksheet);
-}
-
-function createSimpleRankingWorksheet(workbook, name, title, items, valueKey, formatter = null) {
-  const worksheet = workbook.addWorksheet(name);
-  worksheet.addRow(["Posicao", "Cliente", title]);
-
-  items.forEach((item, index) => {
-    worksheet.addRow([
-      index + 1,
-      item.nome,
-      formatter ? formatter(item[valueKey]) : item[valueKey],
-    ]);
-  });
-
-  applyWorksheetChrome(worksheet);
-  autoSizeColumns(worksheet);
-  return worksheet;
-}
-
-function createPendingWorksheet(workbook, report) {
-  const worksheet = workbook.addWorksheet("Pendencias");
-  worksheet.addRow(["Cliente", "Valor pendente", "Lancamentos vencidos"]);
-
-  report.ranking.clientesComLancamentosVencidos.forEach((item) => {
-    worksheet.addRow([item.nome, item.valorPendente, item.lancamentosVencidos]);
-  });
-
-  applyWorksheetChrome(worksheet);
-  applyCurrencyFormat(worksheet, [2]);
-  autoSizeColumns(worksheet);
-}
-
-async function buildClientsWorkbook(report) {
+async function buildWorkbookForType(type, report) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Portal Logistica";
   workbook.created = new Date();
-  workbook.modified = new Date();
 
-  createSummaryWorksheet(workbook, report);
-  createClientsWorksheet(workbook, report);
-  const receitaWorksheet = createSimpleRankingWorksheet(
-    workbook,
-    "Ranking Receita",
-    "Receita total",
-    report.ranking.topReceita,
-    "receitaTotal",
-  );
-  applyCurrencyFormat(receitaWorksheet, [3]);
-
-  createSimpleRankingWorksheet(
-    workbook,
-    "Ranking Volume",
-    "Total de entregas",
-    report.ranking.topVolumeEntregas,
-    "totalEntregas",
-  );
-  createPendingWorksheet(workbook, report);
-
-  return workbook.xlsx.writeBuffer();
-}
-
-function createFleetSummaryWorksheet(workbook, report, filters) {
-  const worksheet = workbook.addWorksheet("Resumo Frota");
-  worksheet.addRow(["Indicador", "Valor"]);
-  worksheet.addRows([
-    ["Periodo aplicado", formatPeriodLabel(filters)],
-    ["Receita operacional", report.resumo.receitaTotal],
-    ["Despesa operacional", report.resumo.despesaTotal],
-    ["Lucro operacional", report.resumo.lucroOperacional],
-    ["Resultado liquido", report.resumo.lucroOperacional],
-    ["Margem operacional", report.resumo.margemOperacional / 100],
-    ["Veiculos com movimento", report.resumo.totalVeiculosComMovimento],
-    ["Motoristas com movimento", report.resumo.totalMotoristasComMovimento],
-    ["Lancamentos vencidos", report.resumo.lancamentosVencidos],
-  ]);
-
-  applyWorksheetChrome(worksheet);
-  worksheet.getCell("B3").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B4").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B5").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B6").numFmt = '"R$" #,##0.00';
-  worksheet.getCell("B7").numFmt = "0.00%";
-  autoSizeColumns(worksheet);
-}
-
-function createFleetBreakdownWorksheet(workbook, name, rows, kind) {
-  const worksheet = workbook.addWorksheet(name);
-  worksheet.addRow([
-    kind === "veiculo" ? "Placa" : "Motorista",
-    "Descricao",
-    "Status",
-    "Total de entregas",
-    "Receita total",
-    "Despesa total",
-    "Resultado liquido",
-    "Margem",
-  ]);
-
-  rows.forEach((item) => {
-    worksheet.addRow([
-      kind === "veiculo" ? item.placa : item.nome,
-      kind === "veiculo" ? item.modelo : item.nome,
-      item.status,
-      item.totalEntregas,
-      item.receitaTotal,
-      item.despesaTotal,
-      item.lucro,
-      item.margem / 100,
+  if (type === "resumo") {
+    const worksheet = workbook.addWorksheet("Resumo");
+    worksheet.addRow(["Indicador", "Valor"]);
+    worksheet.addRows([
+      ["Periodo", formatPeriodLabel(report.filtros)],
+      ["Total de entregas", report.resumo.totalEntregas],
+      ["Receita total", report.resumo.receitaTotal],
+      ["Despesa total", report.resumo.despesaTotal],
+      ["Resultado financeiro", report.resumo.resultadoFinanceiro],
     ]);
-  });
+    applyWorksheetChrome(worksheet);
+    applyCurrencyFormat(worksheet, [2]);
+    autoSizeColumns(worksheet);
+  }
 
-  applyWorksheetChrome(worksheet);
-  applyCurrencyFormat(worksheet, [5, 6, 7]);
-  worksheet.getColumn(8).numFmt = "0.00%";
-  autoSizeColumns(worksheet);
-}
+  if (type === "entregas") {
+    const worksheet = workbook.addWorksheet("Entregas");
+    worksheet.addRow(["Codigo", "Cliente", "Cidade", "Estado", "Status", "Data prevista", "Valor frete"]);
+    report.entregas.forEach((item) => {
+      worksheet.addRow([
+        item.codigo,
+        item.cliente,
+        item.cidade,
+        item.estado,
+        item.status,
+        item.dataPrevista || "",
+        item.valorFrete != null ? Number(item.valorFrete) : null,
+      ]);
+    });
+    applyWorksheetChrome(worksheet);
+    applyCurrencyFormat(worksheet, [7]);
+    autoSizeColumns(worksheet);
+  }
 
-function createFleetExpensesWorksheet(workbook, report) {
-  const worksheet = workbook.addWorksheet("Maiores Despesas");
-  worksheet.addRow(["Descricao", "Tipo", "Veiculo", "Motorista", "Status", "Data", "Valor"]);
-
-  report.ranking.maioresDespesas.forEach((item) => {
+  if (type === "financeiro") {
+    const worksheet = workbook.addWorksheet("Financeiro");
     worksheet.addRow([
-      item.descricao,
-      item.tipo,
-      item.veiculo ? `${item.veiculo.placa} - ${item.veiculo.modelo}` : "",
-      item.motorista?.nome || "",
-      item.status,
-      parseExcelDate(item.dataDespesa),
-      item.valor,
+      "Descricao",
+      "Tipo",
+      "Status",
+      "Cliente",
+      "Entrega",
+      "Competencia",
+      "Vencimento",
+      "Pagamento",
+      "Valor",
     ]);
-  });
+    report.lancamentos.forEach((item) => {
+      worksheet.addRow([
+        item.descricao,
+        item.tipo,
+        item.status,
+        item.cliente?.nome || "",
+        item.entrega?.codigo || "",
+        item.dataCompetencia || "",
+        item.dataVencimento || "",
+        item.dataPagamento || "",
+        item.valor,
+      ]);
+    });
+    applyWorksheetChrome(worksheet);
+    applyCurrencyFormat(worksheet, [9]);
+    autoSizeColumns(worksheet);
+  }
 
-  applyWorksheetChrome(worksheet);
-  applyDateFormat(worksheet, [6]);
-  applyCurrencyFormat(worksheet, [7]);
-  autoSizeColumns(worksheet);
-}
-
-async function buildFleetWorkbook(report, filters) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Portal Logistica";
-  workbook.created = new Date();
-  workbook.modified = new Date();
-
-  createFleetSummaryWorksheet(workbook, report, filters);
-  createFleetBreakdownWorksheet(workbook, "Veiculos", report.veiculos, "veiculo");
-  createFleetBreakdownWorksheet(workbook, "Motoristas", report.motoristas, "motorista");
-  createFleetExpensesWorksheet(workbook, report);
+  if (type === "frota") {
+    const worksheet = workbook.addWorksheet("Frota");
+    worksheet.addRow([
+      "Veiculo",
+      "Modelo",
+      "Entregas",
+      "Receita total",
+      "Despesa total",
+      "Resultado liquido",
+      "Margem",
+      "Manutencoes",
+      "Custo manutencao",
+    ]);
+    report.veiculos.forEach((item) => {
+      worksheet.addRow([
+        item.placa,
+        item.modelo,
+        item.totalEntregas,
+        item.receitaTotal,
+        item.despesaTotal,
+        item.lucro,
+        item.margem / 100,
+        item.totalManutencoes || 0,
+        item.custoManutencao || 0,
+      ]);
+    });
+    applyWorksheetChrome(worksheet);
+    applyCurrencyFormat(worksheet, [4, 5, 6, 9]);
+    worksheet.getColumn(7).numFmt = "0.00%";
+    autoSizeColumns(worksheet);
+  }
 
   return workbook.xlsx.writeBuffer();
 }
@@ -476,6 +346,22 @@ async function loadFleetCostReport(userId, filters) {
   return reportRepository.getFleetCostReport(userId, filters);
 }
 
+async function loadSummaryReport(userId, filters) {
+  return reportRepository.getSummaryReport(userId, filters);
+}
+
+async function loadDeliveriesReport(userId, filters) {
+  return reportRepository.getDeliveriesReport(userId, filters);
+}
+
+async function loadFinancialReport(userId, filters) {
+  return reportRepository.getFinancialReport(userId, filters);
+}
+
+async function loadFleetReport(userId, filters) {
+  return reportRepository.getFleetReport(userId, filters);
+}
+
 async function listByClient(req, res) {
   const { errors, data } = validateClientReportFilters(req.query);
   if (errors.length > 0) {
@@ -483,6 +369,86 @@ async function listByClient(req, res) {
   }
 
   res.json(await loadClientReport(req.user, data));
+}
+
+async function getSummary(req, res) {
+  const { errors, data } = validateCommonReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  res.json(await loadSummaryReport(req.user, data));
+}
+
+async function getDeliveries(req, res) {
+  const { errors, data } = validateCommonReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  res.json(await loadDeliveriesReport(req.user, data));
+}
+
+async function getFinancial(req, res) {
+  const { errors, data } = validateCommonReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  res.json(await loadFinancialReport(req.user, data));
+}
+
+async function getFleet(req, res) {
+  const { errors, data } = validateCommonReportFilters(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  res.json(await loadFleetReport(req.user, data));
+}
+
+async function exportGeneric(req, res) {
+  const { errors, data } = validateReportExport(req.query);
+  if (errors.length > 0) {
+    throw new HttpError(400, "Filtros invalidos", errors);
+  }
+
+  const loaders = {
+    resumo: loadSummaryReport,
+    entregas: loadDeliveriesReport,
+    financeiro: loadFinancialReport,
+    frota: loadFleetReport,
+  };
+  const csvBuilders = {
+    resumo: buildSummaryCsv,
+    entregas: buildDeliveriesCsv,
+    financeiro: buildFinancialCsv,
+    frota: buildFleetCostsCsv,
+  };
+
+  const report = await loaders[data.tipoExportacao](req.user, data);
+
+  if (data.formato === "csv") {
+    const csv = csvBuilders[data.tipoExportacao](report);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="relatorios_${data.tipoExportacao}.csv"`,
+    );
+    res.status(200).send(csv);
+    return;
+  }
+
+  const buffer = await buildWorkbookForType(data.tipoExportacao, report);
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="relatorios_${data.tipoExportacao}.xlsx"`,
+  );
+  res.status(200).send(Buffer.from(buffer));
 }
 
 async function exportClientsCsv(req, res) {
@@ -493,9 +459,8 @@ async function exportClientsCsv(req, res) {
 
   const report = await loadClientReport(req.user, data);
   const csv = buildClientsCsv(report.clientes);
-
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${buildExportFileName(data)}"`);
+  res.setHeader("Content-Disposition", 'attachment; filename="relatorios_clientes.csv"');
   res.status(200).send(csv);
 }
 
@@ -506,13 +471,24 @@ async function exportClientsXlsx(req, res) {
   }
 
   const report = await loadClientReport(req.user, data);
-  const buffer = await buildClientsWorkbook(report);
-
+  const buffer = await buildWorkbookForType("financeiro", {
+    lancamentos: report.clientes.map((item) => ({
+      descricao: item.nome,
+      tipo: "receita",
+      status: "pago",
+      cliente: { nome: item.nome },
+      entrega: null,
+      dataCompetencia: data.dataInicio,
+      dataVencimento: data.dataFim,
+      dataPagamento: data.dataFim,
+      valor: item.receitaTotal,
+    })),
+  });
   res.setHeader(
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   );
-  res.setHeader("Content-Disposition", `attachment; filename="${buildExportXlsxFileName(data)}"`);
+  res.setHeader("Content-Disposition", 'attachment; filename="relatorios_clientes.xlsx"');
   res.status(200).send(Buffer.from(buffer));
 }
 
@@ -524,9 +500,8 @@ async function exportFleetCostsCsv(req, res) {
 
   const report = await loadFleetCostReport(req.user, data);
   const csv = buildFleetCostsCsv(report);
-
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${buildFleetExportFileName(data)}"`);
+  res.setHeader("Content-Disposition", 'attachment; filename="relatorios_frota.csv"');
   res.status(200).send(csv);
 }
 
@@ -537,16 +512,12 @@ async function exportFleetCostsXlsx(req, res) {
   }
 
   const report = await loadFleetCostReport(req.user, data);
-  const buffer = await buildFleetWorkbook(report, data);
-
+  const buffer = await buildWorkbookForType("frota", report);
   res.setHeader(
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   );
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="${buildFleetExportXlsxFileName(data)}"`,
-  );
+  res.setHeader("Content-Disposition", 'attachment; filename="relatorios_frota.xlsx"');
   res.status(200).send(Buffer.from(buffer));
 }
 
@@ -580,11 +551,14 @@ module.exports = {
   buildRankings,
   buildClientsCsv,
   buildFleetCostsCsv,
-  buildClientsWorkbook,
-  buildFleetWorkbook,
   exportClientsCsv,
   exportClientsXlsx,
   exportFleetCostsCsv,
   exportFleetCostsXlsx,
   getFleetCostsReport,
+  getSummary,
+  getDeliveries,
+  getFinancial,
+  getFleet,
+  exportGeneric,
 };

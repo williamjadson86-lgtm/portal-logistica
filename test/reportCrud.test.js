@@ -16,15 +16,25 @@ function binaryParser(response, callback) {
 
 const originalRepositories = {
   findById: userRepository.findById,
+  listSupportData: reportRepository.listSupportData,
   listByClient: reportRepository.listByClient,
   getClientReportDetails: reportRepository.getClientReportDetails,
+  getSummaryReport: reportRepository.getSummaryReport,
+  getDeliveriesReport: reportRepository.getDeliveriesReport,
+  getFinancialReport: reportRepository.getFinancialReport,
+  getFleetReport: reportRepository.getFleetReport,
   getFleetCostReport: reportRepository.getFleetCostReport,
 };
 
 function restoreRepositories() {
   userRepository.findById = originalRepositories.findById;
+  reportRepository.listSupportData = originalRepositories.listSupportData;
   reportRepository.listByClient = originalRepositories.listByClient;
   reportRepository.getClientReportDetails = originalRepositories.getClientReportDetails;
+  reportRepository.getSummaryReport = originalRepositories.getSummaryReport;
+  reportRepository.getDeliveriesReport = originalRepositories.getDeliveriesReport;
+  reportRepository.getFinancialReport = originalRepositories.getFinancialReport;
+  reportRepository.getFleetReport = originalRepositories.getFleetReport;
   reportRepository.getFleetCostReport = originalRepositories.getFleetCostReport;
 }
 
@@ -145,6 +155,84 @@ function createFleetReport() {
   };
 }
 
+function createSummaryReport() {
+  return {
+    filtros: {
+      dataInicio: "2026-06-01",
+      dataFim: "2026-06-30",
+    },
+    resumo: {
+      totalEntregas: 12,
+      receitaTotal: 5400,
+      despesaTotal: 1900,
+      resultadoFinanceiro: 3500,
+      entregasPorStatus: { pendente: 2, entregue: 10 },
+      lancamentosPorStatus: { pago: 4200, pendente: 1200 },
+      despesasVeiculosPorStatus: { pago: 1500, pendente: 400 },
+    },
+    apoio: {
+      clientes: [{ id: "d57f0340-2e40-4da3-8437-f474d7ffd2ce", nome: "Acme Logistica" }],
+      veiculos: [{ id: "f46bde49-cf4f-4e56-8f32-bd4426cf4f93", placa: "ABC1D23", modelo: "Sprinter" }],
+      motoristas: [{ id: "99b8d761-3792-43c4-ab67-5520d5f11003", nome: "Paulo Nunes" }],
+    },
+  };
+}
+
+function createDeliveriesReport() {
+  return {
+    filtros: {
+      dataInicio: "2026-06-01",
+      dataFim: "2026-06-30",
+    },
+    resumo: {
+      totalEntregas: 2,
+      porStatus: { pendente: 1, entregue: 1 },
+      porCidadeEstado: [{ cidade: "Sao Paulo", estado: "SP", total: 2, pendentes: 1, entregues: 1 }],
+    },
+    entregas: [
+      {
+        id: "c79086e6-94ce-4376-b0c2-6de9454cb64d",
+        codigo: "ENT-001",
+        cliente: "Acme Logistica",
+        cidade: "Sao Paulo",
+        estado: "SP",
+        status: "pendente",
+        dataPrevista: "2026-06-09",
+        valorFrete: 350.9,
+      },
+    ],
+  };
+}
+
+function createFinancialReport() {
+  return {
+    filtros: {
+      dataInicio: "2026-06-01",
+      dataFim: "2026-06-30",
+    },
+    resumo: {
+      totalLancamentos: 2,
+      receitaTotal: 5400,
+      despesaTotal: 1900,
+      resultadoFinanceiro: 3500,
+      porStatus: { pago: 4200, pendente: 1200 },
+      porTipo: { receita: 5400, despesa: 1900 },
+    },
+    lancamentos: [
+      {
+        id: "4d717d47-cbc2-46ab-9040-77f3219ab86c",
+        descricao: "Repasse semanal",
+        tipo: "receita",
+        status: "pago",
+        cliente: { nome: "Acme Logistica" },
+        entrega: { codigo: "ENT-001" },
+        dataCompetencia: "2026-06-09",
+        valor: 350.5,
+      },
+    ],
+  };
+}
+
 test.afterEach(() => {
   restoreRepositories();
 });
@@ -182,6 +270,74 @@ test("retorna resumo por cliente autenticado", async () => {
   assert.equal(response.body.resumo.valorPendente, 350.5);
   assert.equal(response.body.resumo.valorPago, 850);
   assert.equal(response.body.ranking.topReceita[0].nome, "Acme Logistica");
+});
+
+test("pagina de relatorios responde autenticada", async () => {
+  mockAuthenticatedUser();
+
+  const response = await request(app).get("/relatorios").set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.match(response.text, /Relatorios operacionais e financeiros/);
+});
+
+test("api de resumo responde com apoio e consolidado", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getSummaryReport = async () => createSummaryReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/resumo?data_inicio=2026-06-01&data_fim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.resumo.totalEntregas, 12);
+  assert.equal(response.body.resumo.resultadoFinanceiro, 3500);
+  assert.equal(response.body.apoio.clientes[0].nome, "Acme Logistica");
+});
+
+test("api de entregas respeita filtros obrigatorios", async () => {
+  mockAuthenticatedUser();
+  let receivedFilters = null;
+  reportRepository.getDeliveriesReport = async (_userId, filters) => {
+    receivedFilters = filters;
+    return createDeliveriesReport();
+  };
+
+  const response = await request(app)
+    .get("/api/relatorios/entregas?data_inicio=2026-06-01&data_fim=2026-06-30&status=pendente&cliente_id=d57f0340-2e40-4da3-8437-f474d7ffd2ce")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(receivedFilters.status, "pendente");
+  assert.equal(receivedFilters.clienteId, "d57f0340-2e40-4da3-8437-f474d7ffd2ce");
+  assert.equal(response.body.resumo.porStatus.pendente, 1);
+});
+
+test("api financeira responde consolidado por status e tipo", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFinancialReport = async () => createFinancialReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/financeiro?data_inicio=2026-06-01&data_fim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.resumo.receitaTotal, 5400);
+  assert.equal(response.body.resumo.porTipo.receita, 5400);
+  assert.equal(response.body.lancamentos[0].descricao, "Repasse semanal");
+});
+
+test("api de frota responde no contrato novo", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFleetReport = async () => createFleetReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/frota?data_inicio=2026-06-01&data_fim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.resumo.receitaTotal, 5400);
+  assert.equal(response.body.veiculos[0].placa, "ABC1D23");
 });
 
 test("encaminha filtro por periodo ao repositorio", async () => {
@@ -466,6 +622,41 @@ test("exportacao xlsx da frota retorna arquivo nao vazio", async () => {
     response.headers["content-type"],
     /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
   );
+  assert.ok(response.body.length > 0);
+  assert.equal(response.body[0], 0x50);
+  assert.equal(response.body[1], 0x4b);
+});
+
+test("exportacao generica csv retorna arquivo correto", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFinancialReport = async () => createFinancialReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/export?tipo=financeiro&formato=csv&data_inicio=2026-06-01&data_fim=2026-06-30")
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers["content-type"], /text\/csv/);
+  assert.match(response.headers["content-disposition"], /relatorios_financeiro\.csv/);
+  assert.match(response.text, /Repasse semanal/);
+});
+
+test("exportacao generica xlsx retorna arquivo correto", async () => {
+  mockAuthenticatedUser();
+  reportRepository.getFleetReport = async () => createFleetReport();
+
+  const response = await request(app)
+    .get("/api/relatorios/export?tipo=frota&formato=xlsx&data_inicio=2026-06-01&data_fim=2026-06-30")
+    .buffer(true)
+    .parse(binaryParser)
+    .set("Cookie", createCookie());
+
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers["content-type"],
+    /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
+  );
+  assert.match(response.headers["content-disposition"], /relatorios_frota\.xlsx/);
   assert.ok(response.body.length > 0);
   assert.equal(response.body[0], 0x50);
   assert.equal(response.body[1], 0x4b);

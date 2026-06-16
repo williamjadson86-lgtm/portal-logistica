@@ -10,27 +10,18 @@ function createReportsApp() {
   const loading = document.querySelector("[data-reports-loading]");
   const filterForm = document.querySelector("[data-reports-filter-form]");
   const summary = document.querySelector("[data-reports-summary]");
-  const tableBody = document.querySelector("[data-reports-table-body]");
-  const detailSummary = document.querySelector("[data-reports-detail-summary]");
-  const detailBlocks = document.querySelector("[data-reports-detail-blocks]");
-  const rankingMain = document.querySelector("[data-reports-ranking-main]");
-  const rankingAlerts = document.querySelector("[data-reports-ranking-alerts]");
+  const deliveriesSummary = document.querySelector("[data-reports-deliveries-summary]");
+  const financialSummary = document.querySelector("[data-reports-financial-summary]");
   const fleetSummary = document.querySelector("[data-reports-fleet-summary]");
   const fleetVehicles = document.querySelector("[data-reports-fleet-vehicles]");
-  const fleetDrivers = document.querySelector("[data-reports-fleet-drivers]");
-  const fleetTypes = document.querySelector("[data-reports-fleet-types]");
-  const fleetExpenses = document.querySelector("[data-reports-fleet-expenses]");
+  const fleetMaintenances = document.querySelector("[data-reports-fleet-maintenances]");
+  const deliveriesTableBody = document.querySelector("[data-reports-deliveries-table-body]");
+  const financialTableBody = document.querySelector("[data-reports-financial-table-body]");
   const refreshButton = document.querySelector("[data-reports-refresh-button]");
   const clearFiltersButton = document.querySelector("[data-reports-clear-filters-button]");
-  const exportButton = document.querySelector("[data-reports-export-button]");
-  const exportExcelButton = document.querySelector("[data-reports-export-excel-button]");
-  const fleetExportButton = document.querySelector("[data-reports-fleet-export-button]");
-  const fleetExportExcelButton = document.querySelector("[data-reports-fleet-export-excel-button]");
-  const clientSelect = document.querySelector("[data-reports-filter-form] [name='clienteId']");
-
-  let rows = [];
-  let availableClients = [];
-  let selectedClientId = null;
+  const clientSelect = filterForm.querySelector("[name='clienteId']");
+  const vehicleSelect = filterForm.querySelector("[name='veiculoId']");
+  const driverSelect = filterForm.querySelector("[name='motoristaId']");
 
   function handlePageError(error) {
     if (error.message === "Sessao invalida" || error.message === "Autenticacao obrigatoria") {
@@ -53,23 +44,18 @@ function createReportsApp() {
     return query.toString();
   }
 
-  function renderClientOptions() {
-    const options = availableClients
-      .map((client) => `<option value="${client.id}">${client.nome}</option>`)
-      .join("");
-
-    clientSelect.innerHTML = `<option value="">Todos os clientes</option>${options}`;
+  function renderSelectOptions(select, items, formatter, emptyLabel) {
+    select.innerHTML =
+      `<option value="">${emptyLabel}</option>` +
+      items.map((item) => `<option value="${item.id}">${formatter(item)}</option>`).join("");
   }
 
   function renderSummaryCards(data) {
     const cards = [
-      { rotulo: "Clientes no relatorio", valor: data.totalClientes },
       { rotulo: "Total de entregas", valor: data.totalEntregas },
-      { rotulo: "Comprovantes", valor: data.totalComprovantes },
       { rotulo: "Receita total", valor: formatCurrency(data.receitaTotal) },
-      { rotulo: "Valor pendente", valor: formatCurrency(data.valorPendente) },
-      { rotulo: "Valor pago", valor: formatCurrency(data.valorPago) },
-      { rotulo: "Lancamentos vencidos", valor: data.lancamentosVencidos },
+      { rotulo: "Despesa total", valor: formatCurrency(data.despesaTotal) },
+      { rotulo: "Resultado financeiro", valor: formatCurrency(data.resultadoFinanceiro) },
     ];
 
     summary.innerHTML = cards
@@ -84,162 +70,125 @@ function createReportsApp() {
       .join("");
   }
 
-  function renderTable() {
-    if (rows.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="9">Nenhum cliente encontrado para os filtros selecionados.</td></tr>';
-      return;
-    }
-
-    tableBody.innerHTML = rows
-      .map(
-        (row) => `
-          <tr>
-            <td>${row.nome}</td>
-            <td>${row.totalEntregas}</td>
-            <td>${row.totalRotasVinculadas}</td>
-            <td>${row.totalComprovantes}</td>
-            <td>${formatCurrency(row.receitaTotal)}</td>
-            <td>${formatCurrency(row.valorPendente)}</td>
-            <td>${formatCurrency(row.valorPago)}</td>
-            <td>${formatCurrency(row.ticketMedioPorEntrega)}</td>
-            <td>
-              <button class="button ghost small" type="button" data-action="view" data-id="${row.clienteId}">
-                Visualizar detalhe
-              </button>
-            </td>
-          </tr>
-        `,
-      )
-      .join("");
-  }
-
-  function renderRankingList(title, items, formatter) {
-    if (!Array.isArray(items) || items.length === 0) {
-      return `
-        <article class="data-card empty">
-          <strong>${title}</strong>
-          <p>Nenhum cliente encontrado para este ranking.</p>
-        </article>
-      `;
-    }
-
-    return `
-      <article class="data-card">
-        <h3>${title}</h3>
-        ${items
-          .map(
-            (item, index) => `
-              <p>${index + 1}. ${item.nome} | ${formatter(item)}</p>
-            `,
-          )
-          .join("")}
-      </article>
-    `;
-  }
-
-  function renderRankings(ranking) {
-    if (!ranking) {
-      rankingMain.innerHTML = `
-        <article class="data-card empty">
-          <strong>Ranking indisponivel</strong>
-          <p>Carregue os relatorios para visualizar os destaques comerciais.</p>
-        </article>
-      `;
-      rankingAlerts.innerHTML = `
-        <article class="data-card empty">
-          <strong>Nenhum alerta carregado</strong>
-          <p>Os clientes com maior pendencia e vencimento aparecerao aqui.</p>
-        </article>
-      `;
-      return;
-    }
-
-    rankingMain.innerHTML = [
-      renderRankingList("Top 5 por receita", ranking.topReceita, (item) =>
-        formatCurrency(item.receitaTotal),
-      ),
-      renderRankingList("Top 5 por volume de entregas", ranking.topVolumeEntregas, (item) =>
-        `${item.totalEntregas} entregas`,
-      ),
-    ].join("");
-
-    rankingAlerts.innerHTML = [
-      renderRankingList("Top 5 por valor pendente", ranking.topValorPendente, (item) =>
-        formatCurrency(item.valorPendente),
-      ),
-      renderRankingList(
-        "Clientes com lancamentos vencidos",
-        ranking.clientesComLancamentosVencidos,
-        (item) => `${item.lancamentosVencidos} vencido(s)`,
-      ),
-    ].join("");
-  }
-
-  function renderFleetList(container, items, builder, emptyTitle, emptyText) {
-    if (!Array.isArray(items) || items.length === 0) {
+  function renderMetricList(container, items, emptyText) {
+    if (!items || items.length === 0) {
       container.innerHTML = `
         <article class="data-card empty">
-          <strong>${emptyTitle}</strong>
+          <strong>Sem dados</strong>
           <p>${emptyText}</p>
         </article>
       `;
       return;
     }
 
-    container.innerHTML = items.map(builder).join("");
+    container.innerHTML = items
+      .map(
+        (item) => `
+          <article class="data-card">
+            <h3>${item.titulo}</h3>
+            <strong>${item.valor}</strong>
+            <p>${item.descricao}</p>
+          </article>
+        `,
+      )
+      .join("");
   }
 
-  function renderFleetReport(report) {
-    if (!report) {
-      fleetSummary.innerHTML = `
-        <article class="stat-card compact">
-          <span>Receita operacional</span>
-          <strong>R$ 0,00</strong>
-        </article>
-      `;
-      renderFleetList(
-        fleetVehicles,
-        [],
-        () => "",
-        "Sem dados de frota",
-        "Os veiculos com movimento aparecerao aqui.",
-      );
-      renderFleetList(
-        fleetDrivers,
-        [],
-        () => "",
-        "Sem dados de motoristas",
-        "As associacoes de custo e receita aparecerao aqui.",
-      );
-      renderFleetList(
-        fleetTypes,
-        [],
-        () => "",
-        "Nenhum custo consolidado",
-        "Cadastre despesas de frota para visualizar a composicao por tipo.",
-      );
-      renderFleetList(
-        fleetExpenses,
-        [],
-        () => "",
-        "Nenhuma despesa carregada",
-        "Os maiores custos do periodo aparecerao aqui.",
-      );
+  function renderDeliveriesReport(report) {
+    const statusItems = Object.entries(report.resumo.porStatus || {}).map(([status, total]) => ({
+      titulo: createStatusLabel(status),
+      valor: total,
+      descricao: "Entregas neste status com os filtros atuais.",
+    }));
+    const regionItems = (report.resumo.porCidadeEstado || []).slice(0, 5).map((item) => ({
+      titulo: `${item.cidade} / ${item.estado}`,
+      valor: `${item.total} entrega(s)`,
+      descricao: `Pendentes: ${item.pendentes} | Entregues: ${item.entregues}`,
+    }));
+
+    renderMetricList(
+      deliveriesSummary,
+      [...statusItems, ...regionItems],
+      "Nenhuma entrega encontrada para os filtros aplicados.",
+    );
+
+    if (!Array.isArray(report.entregas) || report.entregas.length === 0) {
+      deliveriesTableBody.innerHTML = '<tr><td colspan="6">Nenhuma entrega encontrada.</td></tr>';
       return;
     }
 
-    const summaryCards = [
+    deliveriesTableBody.innerHTML = report.entregas
+      .map(
+        (item) => `
+          <tr>
+            <td>${item.codigo}</td>
+            <td>${item.cliente}</td>
+            <td>${item.cidade || "-"} / ${item.estado || "-"}</td>
+            <td><span class="status-tag">${createStatusLabel(item.status)}</span></td>
+            <td>${item.dataPrevista || "-"}</td>
+            <td>${item.valorFrete != null ? formatCurrency(item.valorFrete) : "-"}</td>
+          </tr>
+        `,
+      )
+      .join("");
+  }
+
+  function renderFinancialReport(report) {
+    const statusItems = Object.entries(report.resumo.porStatus || {}).map(([status, total]) => ({
+      titulo: `Status ${createStatusLabel(status)}`,
+      valor: formatCurrency(total),
+      descricao: "Volume consolidado por status.",
+    }));
+    const typeItems = Object.entries(report.resumo.porTipo || {}).map(([tipo, total]) => ({
+      titulo: `Tipo ${createStatusLabel(tipo)}`,
+      valor: formatCurrency(total),
+      descricao: "Volume consolidado por tipo de lancamento.",
+    }));
+
+    renderMetricList(
+      financialSummary,
+      [
+        { titulo: "Receita", valor: formatCurrency(report.resumo.receitaTotal), descricao: "Receita operacional no periodo." },
+        { titulo: "Despesas", valor: formatCurrency(report.resumo.despesaTotal), descricao: "Despesas e repasses filtrados." },
+        { titulo: "Resultado", valor: formatCurrency(report.resumo.resultadoFinanceiro), descricao: "Receita menos despesas." },
+        ...statusItems,
+        ...typeItems,
+      ],
+      "Nenhum lancamento encontrado para os filtros aplicados.",
+    );
+
+    if (!Array.isArray(report.lancamentos) || report.lancamentos.length === 0) {
+      financialTableBody.innerHTML = '<tr><td colspan="6">Nenhum lancamento encontrado.</td></tr>';
+      return;
+    }
+
+    financialTableBody.innerHTML = report.lancamentos
+      .map(
+        (item) => `
+          <tr>
+            <td>${item.descricao}</td>
+            <td>${createStatusLabel(item.tipo)}</td>
+            <td><span class="status-tag">${createStatusLabel(item.status)}</span></td>
+            <td>${item.cliente?.nome || "-"}</td>
+            <td>${item.dataCompetencia || "-"}</td>
+            <td>${formatCurrency(item.valor)}</td>
+          </tr>
+        `,
+      )
+      .join("");
+  }
+
+  function renderFleetReport(report) {
+    const cards = [
       { rotulo: "Receita operacional", valor: formatCurrency(report.resumo.receitaTotal) },
       { rotulo: "Despesa da frota", valor: formatCurrency(report.resumo.despesaTotal) },
-      { rotulo: "Lucro operacional", valor: formatCurrency(report.resumo.lucroOperacional) },
       { rotulo: "Resultado liquido", valor: formatCurrency(report.resumo.resultadoLiquido) },
       { rotulo: "Margem operacional", valor: `${report.resumo.margemOperacional}%` },
       { rotulo: "Veiculos com movimento", valor: report.resumo.totalVeiculosComMovimento },
       { rotulo: "Motoristas com movimento", valor: report.resumo.totalMotoristasComMovimento },
-      { rotulo: "Lancamentos vencidos", valor: report.resumo.lancamentosVencidos },
     ];
 
-    fleetSummary.innerHTML = summaryCards
+    fleetSummary.innerHTML = cards
       .map(
         (item) => `
           <article class="stat-card compact">
@@ -250,252 +199,28 @@ function createReportsApp() {
       )
       .join("");
 
-    renderFleetList(
+    renderMetricList(
       fleetVehicles,
-      report.ranking.topVeiculosLucratividade,
-      (item) => `
-        <article class="data-card">
-          <div class="data-card-top">
-            <div>
-              <h3>${item.placa}</h3>
-              <p>${item.modelo}</p>
-            </div>
-            <span class="status-tag">${item.totalEntregas} entregas</span>
-          </div>
-          <strong>${formatCurrency(item.lucro)}</strong>
-          <p>Receita ${formatCurrency(item.receitaTotal)} | Custo ${formatCurrency(item.despesaTotal)} | Margem ${item.margem}%</p>
-        </article>
-      `,
-      "Sem dados de frota",
-      "Os veiculos com movimento aparecerao aqui.",
+      (report.ranking.custosPorVeiculo || []).map((item) => ({
+        titulo: `${item.placa} - ${item.modelo}`,
+        valor: formatCurrency(item.despesaTotal),
+        descricao: `Entregas: ${item.totalEntregas} | Receita: ${formatCurrency(item.receitaTotal)} | Margem: ${item.margem}%`,
+      })),
+      "Nenhum custo de frota encontrado para os filtros aplicados.",
     );
 
-    renderFleetList(
-      fleetDrivers,
-      report.ranking.topMotoristasLucratividade,
-      (item) => `
-        <article class="data-card">
-          <div class="data-card-top">
-            <div>
-              <h3>${item.nome}</h3>
-              <p>${createStatusLabel(item.status)}</p>
-            </div>
-            <span class="status-tag">${item.totalEntregas} entregas</span>
-          </div>
-          <strong>${formatCurrency(item.lucro)}</strong>
-          <p>Receita ${formatCurrency(item.receitaTotal)} | Custo ${formatCurrency(item.despesaTotal)} | Margem ${item.margem}%</p>
-        </article>
-      `,
-      "Sem dados de motoristas",
-      "As associacoes de custo e receita aparecerao aqui.",
-    );
-
-    renderFleetList(
-      fleetTypes,
-      Object.entries(report.resumo.custosPorTipo || {}),
-      ([tipo, valor]) => `
-        <article class="data-card">
-          <h3>${createStatusLabel(tipo)}</h3>
-          <strong>${formatCurrency(valor)}</strong>
-          <p>Participacao consolidada no periodo filtrado.</p>
-        </article>
-      `,
-      "Nenhum custo consolidado",
-      "Cadastre despesas de frota para visualizar a composicao por tipo.",
-    );
-
-    renderFleetList(
-      fleetExpenses,
-      report.ranking.maioresDespesas,
-      (item) => `
-        <article class="data-card">
-          <div class="data-card-top">
-            <div>
-              <h3>${item.descricao}</h3>
-              <p>${item.veiculo ? `${item.veiculo.placa} - ${item.veiculo.modelo}` : "Veiculo nao informado"}</p>
-            </div>
-            <span class="status-tag">${createStatusLabel(item.tipo)}</span>
-          </div>
-          <strong>${formatCurrency(item.valor)}</strong>
-          <p>${item.dataDespesa || "-"} | ${createStatusLabel(item.status)}</p>
-        </article>
-      `,
-      "Nenhuma despesa carregada",
-      "Os maiores custos do periodo aparecerao aqui.",
+    renderMetricList(
+      fleetMaintenances,
+      (report.manutencoesPorVeiculo || []).map((item) => ({
+        titulo: `${item.placa} - ${item.modelo}`,
+        valor: formatCurrency(item.custoTotal),
+        descricao: `${item.totalManutencoes} manutencao(oes) vinculada(s).`,
+      })),
+      "Nenhuma manutencao encontrada para os filtros aplicados.",
     );
   }
 
-  function renderDetail(detail) {
-    if (!detail) {
-      detailSummary.className = "delivery-details empty";
-      detailSummary.textContent =
-        "Selecione um cliente no relatorio para visualizar o detalhe operacional e financeiro.";
-      detailBlocks.innerHTML = `
-        <article class="data-card empty">
-          <strong>Nenhum cliente selecionado</strong>
-          <p>Use a tabela para visualizar entregas, financeiro e comprovantes vinculados.</p>
-        </article>
-      `;
-      return;
-    }
-
-    detailSummary.className = "delivery-details";
-    detailSummary.innerHTML = `
-      <div class="detail-grid">
-        <div><span>Cliente</span><strong>${detail.cliente.nome}</strong></div>
-        <div><span>Status</span><strong>${createStatusLabel(detail.cliente.status)}</strong></div>
-        <div><span>Documento</span><strong>${detail.cliente.documento}</strong></div>
-        <div><span>Cidade / UF</span><strong>${detail.cliente.cidade} / ${detail.cliente.estado}</strong></div>
-        <div><span>Total de entregas</span><strong>${detail.resumoOperacional.totalEntregas}</strong></div>
-        <div><span>Receita total</span><strong>${formatCurrency(detail.resumoFinanceiro.receitaTotal)}</strong></div>
-      </div>
-    `;
-
-    const entregaItems =
-      detail.entregasRecentes.length > 0
-        ? detail.entregasRecentes
-            .map(
-              (item) => `
-                <article class="data-card">
-                  <div class="data-card-top">
-                    <div>
-                      <h3>${item.codigo}</h3>
-                      <p>${item.origem} -> ${item.destino}</p>
-                    </div>
-                    <span class="status-tag">${createStatusLabel(item.status)}</span>
-                  </div>
-                  <strong>${item.dataPrevista || "Sem data prevista"}</strong>
-                  <p>${item.rotaAtual ? `Rota ${item.rotaAtual.codigo}` : "Sem rota ativa"}</p>
-                </article>
-              `,
-            )
-            .join("")
-        : '<article class="data-card empty"><strong>Nenhuma entrega recente</strong><p>Este cliente ainda nao possui entregas vinculadas.</p></article>';
-
-    const financialItems =
-      detail.lancamentosRecentes.length > 0
-        ? detail.lancamentosRecentes
-            .map(
-              (item) => `
-                <article class="data-card">
-                  <div class="data-card-top">
-                    <div>
-                      <h3>${item.descricao}</h3>
-                      <p>${item.entrega?.codigo || "Sem entrega vinculada"}</p>
-                    </div>
-                    <span class="status-tag">${createStatusLabel(item.status)}</span>
-                  </div>
-                  <strong>${formatCurrency(item.valor)}</strong>
-                  <p>${item.dataCompetencia || "Sem competencia"} | ${createStatusLabel(item.tipo)}</p>
-                </article>
-              `,
-            )
-            .join("")
-        : '<article class="data-card empty"><strong>Nenhum lancamento recente</strong><p>Este cliente ainda nao possui historico financeiro vinculado.</p></article>';
-
-    const proofItems =
-      detail.comprovantes.length > 0
-        ? detail.comprovantes
-            .map(
-              (item) => `
-                <article class="data-card">
-                  <div class="data-card-top">
-                    <div>
-                      <h3>${item.arquivoNome || item.tipo}</h3>
-                      <p>${item.codigoEntrega}</p>
-                    </div>
-                    <span class="status-tag">${item.ativo ? "Ativo" : "Inativo"}</span>
-                  </div>
-                  <strong>${item.tipo}</strong>
-                  <p>${item.observacao || "Sem observacao"}</p>
-                </article>
-              `,
-            )
-            .join("")
-        : '<article class="data-card empty"><strong>Nenhum comprovante vinculado</strong><p>As entregas deste cliente ainda nao possuem comprovantes registrados.</p></article>';
-
-    detailBlocks.innerHTML = `
-      <section class="dashboard-two-columns">
-        <article class="module-panel">
-          <div class="section-heading">
-            <div>
-              <span class="status-pill subtle">Resumo operacional</span>
-              <h2>Operacao</h2>
-            </div>
-          </div>
-          <div class="module-list">
-            <article class="data-card">
-              <strong>Pendentes: ${detail.resumoOperacional.entregasPendentes}</strong>
-              <p>Em rota: ${detail.resumoOperacional.entregasEmRota} | Entregues: ${detail.resumoOperacional.entregasEntregues} | Canceladas: ${detail.resumoOperacional.entregasCanceladas}</p>
-            </article>
-            <article class="data-card">
-              <strong>Rotas vinculadas: ${detail.resumoOperacional.totalRotasVinculadas}</strong>
-              <p>Comprovantes ativos: ${detail.resumoOperacional.totalComprovantes}</p>
-            </article>
-          </div>
-        </article>
-
-        <article class="module-panel">
-          <div class="section-heading">
-            <div>
-              <span class="status-pill subtle">Resumo financeiro</span>
-              <h2>Financeiro</h2>
-            </div>
-          </div>
-          <div class="module-list">
-            <article class="data-card">
-              <strong>Receita: ${formatCurrency(detail.resumoFinanceiro.receitaTotal)}</strong>
-              <p>Pendente: ${formatCurrency(detail.resumoFinanceiro.valorPendente)} | Pago: ${formatCurrency(detail.resumoFinanceiro.valorPago)}</p>
-            </article>
-            <article class="data-card">
-              <strong>Lancamentos vencidos: ${detail.resumoFinanceiro.lancamentosVencidos}</strong>
-              <p>Acompanhamento gerencial do cliente.</p>
-            </article>
-          </div>
-        </article>
-      </section>
-
-      <section class="dashboard-two-columns">
-        <article class="module-panel">
-          <div class="section-heading">
-            <div>
-              <span class="status-pill subtle">Entregas recentes</span>
-              <h2>Ultimas entregas</h2>
-            </div>
-          </div>
-          <div class="module-list">${entregaItems}</div>
-        </article>
-
-        <article class="module-panel">
-          <div class="section-heading">
-            <div>
-              <span class="status-pill subtle">Financeiro recente</span>
-              <h2>Ultimos lancamentos</h2>
-            </div>
-          </div>
-          <div class="module-list">${financialItems}</div>
-        </article>
-      </section>
-
-      <article class="module-panel">
-        <div class="section-heading">
-          <div>
-            <span class="status-pill subtle">Comprovantes</span>
-            <h2>Historico vinculado</h2>
-          </div>
-        </div>
-        <div class="module-list">${proofItems}</div>
-      </article>
-    `;
-  }
-
-  async function loadDetail(clientId) {
-    const detail = await requestJson(`/api/relatorios/clientes/${clientId}`);
-    selectedClientId = clientId;
-    renderDetail(detail);
-  }
-
-  async function refreshList(options = {}) {
+  async function refreshList() {
     const filters = serializeForm(filterForm);
     const query = buildQueryString(filters);
 
@@ -503,34 +228,26 @@ function createReportsApp() {
     setMessage(message, "", "");
 
     try {
-      const [response, fleetReport] = await Promise.all([
-        requestJson(`/api/relatorios/clientes${query ? `?${query}` : ""}`),
-        requestJson(`/api/relatorios/frota/custos${query ? `?${query}` : ""}`),
+      const [summaryReport, deliveriesReport, financialReport, fleetReport] = await Promise.all([
+        requestJson(`/api/relatorios/resumo${query ? `?${query}` : ""}`),
+        requestJson(`/api/relatorios/entregas${query ? `?${query}` : ""}`),
+        requestJson(`/api/relatorios/financeiro${query ? `?${query}` : ""}`),
+        requestJson(`/api/relatorios/frota${query ? `?${query}` : ""}`),
       ]);
-      rows = response.clientes;
-      availableClients = response.apoio.clientes || [];
-      renderClientOptions();
-      clientSelect.value = filters.clienteId || "";
-      renderSummaryCards(response.resumo);
-      renderRankings(response.ranking);
+
+      renderSummaryCards(summaryReport.resumo);
+      renderDeliveriesReport(deliveriesReport);
+      renderFinancialReport(financialReport);
       renderFleetReport(fleetReport);
-      renderTable();
 
-      if (selectedClientId) {
-        const selectedExists = rows.some((row) => row.clienteId === selectedClientId);
-        if (selectedExists) {
-          await loadDetail(selectedClientId);
-        } else {
-          selectedClientId = null;
-          renderDetail(null);
-        }
-      } else {
-        renderDetail(null);
-      }
+      const support = summaryReport.apoio || { clientes: [], veiculos: [], motoristas: [] };
+      renderSelectOptions(clientSelect, support.clientes || [], (item) => item.nome, "Todos os clientes");
+      renderSelectOptions(vehicleSelect, support.veiculos || [], (item) => `${item.placa} - ${item.modelo}`, "Todos os veiculos");
+      renderSelectOptions(driverSelect, support.motoristas || [], (item) => item.nome, "Todos os motoristas");
 
-      if (options.successMessage) {
-        setMessage(message, "success", options.successMessage);
-      }
+      clientSelect.value = filters.clienteId || "";
+      vehicleSelect.value = filters.veiculoId || "";
+      driverSelect.value = filters.motoristaId || "";
     } catch (error) {
       handlePageError(error);
     } finally {
@@ -551,47 +268,26 @@ function createReportsApp() {
     refreshList().catch(handlePageError);
   });
 
-  tableBody.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-action='view']");
-    if (!button) {
-      return;
-    }
-
-    loadDetail(button.dataset.id).catch(handlePageError);
-  });
-
   refreshButton.addEventListener("click", () => refreshList().catch(handlePageError));
   clearFiltersButton.addEventListener("click", () => {
     filterForm.reset();
     setDefaultRange();
-    selectedClientId = null;
     refreshList().catch(handlePageError);
   });
-  exportButton.addEventListener("click", () => {
-    const filters = serializeForm(filterForm);
-    const query = buildQueryString(filters);
-    window.location.href = `/api/relatorios/clientes/export.csv${query ? `?${query}` : ""}`;
-  });
-  exportExcelButton.addEventListener("click", () => {
-    const filters = serializeForm(filterForm);
-    const query = buildQueryString(filters);
-    window.location.href = `/api/relatorios/clientes/export.xlsx${query ? `?${query}` : ""}`;
-  });
-  fleetExportButton.addEventListener("click", () => {
-    const filters = serializeForm(filterForm);
-    const query = buildQueryString(filters);
-    window.location.href = `/api/relatorios/frota/custos/export.csv${query ? `?${query}` : ""}`;
-  });
-  fleetExportExcelButton.addEventListener("click", () => {
-    const filters = serializeForm(filterForm);
-    const query = buildQueryString(filters);
-    window.location.href = `/api/relatorios/frota/custos/export.xlsx${query ? `?${query}` : ""}`;
+
+  document.querySelectorAll("[data-export-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const filters = serializeForm(filterForm);
+      const query = buildQueryString({
+        ...filters,
+        tipo: button.dataset.exportType,
+        formato: button.dataset.exportFormat,
+      });
+      window.location.href = `/api/relatorios/export?${query}`;
+    });
   });
 
   setDefaultRange();
-  renderDetail(null);
-  renderRankings(null);
-  renderFleetReport(null);
   refreshList().catch(handlePageError);
 }
 

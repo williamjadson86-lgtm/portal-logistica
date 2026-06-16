@@ -7,6 +7,31 @@ const router = express.Router();
 
 router.get("/relatorios", authMiddleware({ permission: PERMISSIONS.REPORTS_VIEW }), controller.page);
 router.get(
+  "/api/relatorios/resumo",
+  authMiddleware({ api: true, permission: PERMISSIONS.REPORTS_VIEW }),
+  controller.getSummary,
+);
+router.get(
+  "/api/relatorios/entregas",
+  authMiddleware({ api: true, permission: PERMISSIONS.REPORTS_VIEW }),
+  controller.getDeliveries,
+);
+router.get(
+  "/api/relatorios/financeiro",
+  authMiddleware({ api: true, permission: PERMISSIONS.REPORTS_VIEW }),
+  controller.getFinancial,
+);
+router.get(
+  "/api/relatorios/frota",
+  authMiddleware({ api: true, permission: PERMISSIONS.REPORTS_VIEW }),
+  controller.getFleet,
+);
+router.get(
+  "/api/relatorios/export",
+  authMiddleware({ api: true, permission: PERMISSIONS.REPORTS_VIEW }),
+  controller.exportGeneric,
+);
+router.get(
   "/api/relatorios/clientes",
   authMiddleware({ api: true, permission: PERMISSIONS.REPORTS_VIEW }),
   controller.listByClient,
