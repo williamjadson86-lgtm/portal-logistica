@@ -1,301 +1,96 @@
-# Portal Logistica
+# Portal Logística
 
-Portal web para colaboradores e parceiros de uma empresa de entregas logisticas, com login, cadastro, home protegida e autenticacao por JWT em cookie `HttpOnly`.
+Sistema completo de gestão logística desenvolvido com Node.js, Express e PostgreSQL.
 
-## Arquitetura
+## Principais Funcionalidades
 
-O projeto segue organizacao por camadas:
+### Operação Logística
+- Gestão de Entregas
+- Rotas Operacionais
+- Clientes
+- Motoristas
+- Veículos
+- Comprovantes de Entrega
+- Timeline Operacional
 
-- `routes/`: definicao das rotas HTTP e das paginas
-- `controllers/`: fluxo de autenticacao, portal e resposta das requisicoes
-- `validations/`: validacao e normalizacao de dados de login e cadastro
-- `repositories/`: acesso ao PostgreSQL com SQL parametrizado
-- `middlewares/`: autenticacao e tratamento global de erros
-- `views/` e `public/`: frontend em HTML, CSS e JavaScript puro
+### Gestão Financeira
+- Financeiro
+- Rentabilidade
+- Centro de Custos
+- Relatórios Gerenciais
+- Exportação CSV/XLSX
 
-Fluxo principal:
+### Gestão Fiscal
+- Documentos Fiscais
+- Controle de Status
+- Relatórios Fiscais
 
-```text
-HTML/JS -> Rotas Express -> Controllers -> Validations -> Repositories -> PostgreSQL
-```
+### Frota
+- Gestão de Veículos
+- Manutenção Preventiva
+- Manutenção Corretiva
+- Agenda de Revisões
+- Indicadores por KM
 
-## Stack
+### Rastreamento
+- Rastreamento Operacional
+- Histórico por Veículo
+- Alertas de Atraso
+- Alertas de Parada Longa
 
-- Node.js 20+
-- Express 5
+### Aplicativo do Motorista
+- PWA Instalável
+- Atualização de Status
+- Upload de Comprovantes
+- Integração com Rastreamento
+
+### Business Intelligence
+- BI Executivo Avançado
+- Receita
+- Despesa
+- Lucro
+- Margem
+- Tendências por Período
+- Indicadores Operacionais
+
+## Segurança
+
+- Multiempresa (Tenancy)
+- RBAC (Controle de Permissões)
+- JWT via Cookie HttpOnly
+- Validações centralizadas
+- Auditoria de acesso por módulo
+
+## Tecnologias
+
+- Node.js
+- Express
 - PostgreSQL
-- HTML, CSS e JavaScript
-- `bcryptjs` para hash de senha
-- `jsonwebtoken` para sessao
+- JavaScript
+- HTML/CSS
+- Docker Compose
 
-## Estrutura
+## Qualidade
 
-```text
-database/
-  migrations/
-  seeds/
-public/
-  css/
-  img/
-  js/
-scripts/
-  dbCommon.js
-  dbMigrate.js
-  dbSeed.js
-  dbInit.js
-src/
-  config/
-  controllers/
-  errors/
-  middlewares/
-  repositories/
-  routes/
-  validations/
-  app.js
-  server.js
-test/
-  authFlow.test.js
-  userValidation.test.js
-views/
-  login.html
-  cadastro.html
-  home.html
-```
+- Arquitetura em Camadas
+- Testes Automatizados
+- Exportações CSV/XLSX
+- 266 testes passando
 
-## O que ja funciona
+## Instalação
 
-- Cadastro de usuario com persistencia prevista em PostgreSQL
-- Login por matricula e senha
-- Senha armazenada como hash com `bcryptjs`
-- JWT assinado no backend
-- Cookie `HttpOnly` enviado no login e no cadastro
-- Home protegida por middleware de autenticacao
-- Logout com limpeza do cookie
-- Validacao basica no frontend e validacao definitiva no backend
-
-## Pre-requisitos no Windows
-
-1. Instale o Node.js 20 ou superior.
-2. Instale o PostgreSQL localmente.
-3. Durante a instalacao do PostgreSQL, anote:
-   - usuario administrador, normalmente `postgres`
-   - senha definida para esse usuario
-   - porta, normalmente `5432`
-4. Garanta que o `psql` esteja disponivel no terminal:
-
-```powershell
-psql --version
-```
-
-Se o comando nao for reconhecido, adicione o `bin` do PostgreSQL ao `PATH`.
-
-Exemplo comum:
-
-```text
-C:\Program Files\PostgreSQL\17\bin
-```
-
-## Instalacao do projeto
-
-1. Instale as dependencias:
-
-```powershell
+```bash
 npm install
-```
-
-2. Copie o arquivo de ambiente:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-3. Ajuste o `DATABASE_URL` no `.env` com a senha real do seu PostgreSQL local.
-
-Exemplo:
-
-```env
-PORT=3000
-DATABASE_URL=postgresql://postgres:SUA_SENHA@localhost:5432/portal_logistica
-DATABASE_SSL=false
-JWT_SECRET=troque-esta-chave-antes-de-publicar
-JWT_EXPIRES_IN=8h
-COOKIE_NAME=portal_logistica_token
-```
-
-## Banco de dados
-
-O projeto agora usa migrations versionadas com controle em `schema_migrations`. Isso evita drift entre ambientes e elimina o acoplamento com um unico `init.sql`.
-
-### Fluxo recomendado
-
-1. Instale as dependencias:
-
-```powershell
-npm install
-```
-
-2. Copie o arquivo de ambiente:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-3. Ajuste o `.env` com a conexao do PostgreSQL:
-
-```env
-PORT=3000
-DATABASE_URL=postgresql://postgres:SUA_SENHA@localhost:5432/portal_logistica
-DATABASE_SSL=false
-JWT_SECRET=troque-esta-chave-antes-de-publicar
-JWT_EXPIRES_IN=8h
-COOKIE_NAME=portal_logistica_token
-```
-
-4. Rode as migrations:
-
-```powershell
-npm run db:migrate
-```
-
-5. Rode o seed inicial:
-
-```powershell
-npm run db:seed
-```
-
-Isso cria ou atualiza o usuario administrador padrao:
-
-- email: `admin@portallogistica.com`
-- senha: `Admin@123`
-- tipo de usuario: `administrador`
-
-O seed usa `bcryptjs` para hashear a senha antes de persistir.
-
-### Script combinado
-
-Se preferir executar tudo em sequencia:
-
-```powershell
 npm run db:init
+npm start
 ```
 
-Esse comando agora roda `db:migrate` e `db:seed`.
-
-## Scripts npm
-
-- `npm run db:migrate`: aplica migrations pendentes em `database/migrations`
-- `npm run db:seed`: executa os seeds em `database/seeds`
-- `npm run db:init`: roda migrations e seed inicial em sequencia
-- `npm run dev`: inicia a aplicacao em modo watch
-- `npm start`: inicia a aplicacao normalmente
-- `npm test`: roda os testes automatizados
-
-## Como iniciar
-
-```powershell
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
-
-A aplicacao ficara disponivel em:
+Acesse:
 
 ```text
 http://localhost:3000
 ```
 
-## Rotas principais
+## Repositório
 
-### Paginas
-
-- `GET /`
-- `GET /login`
-- `GET /cadastro`
-- `GET /home`
-
-### API
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/users/me`
-- `GET /api/portal/cards`
-- `GET /health`
-
-## Roteiro de teste manual
-
-1. Abra `http://localhost:3000/login`.
-2. Clique em `Primeiro acesso / Cadastre-se`.
-3. Preencha o formulario de cadastro com:
-   - nome completo
-   - CPF valido
-   - e-mail nao utilizado
-   - telefone
-   - matricula/codigo unico
-   - senha e confirmacao
-   - tipo de usuario
-4. Envie o cadastro e confirme:
-   - resposta de sucesso
-   - redirecionamento para `/home`
-5. Saia pelo botao `Sair`.
-6. Tente acessar `http://localhost:3000/home` sem login e confirme redirecionamento para `/login`.
-7. Volte para `/login`.
-8. Informe matricula e senha do usuario criado.
-9. Confirme:
-   - login bem-sucedido
-   - acesso a `/home`
-   - cards do portal carregados
-10. Clique em `Sair` e valide o retorno ao login.
-
-## Verificacoes tecnicas da primeira versao
-
-As checagens abaixo ja foram revisadas no projeto:
-
-- nomes dos campos do frontend batem com o backend:
-  - `nome`
-  - `cpf`
-  - `email`
-  - `telefone`
-  - `matricula`
-  - `senha`
-  - `confirmacaoSenha`
-  - `tipoUsuario`
-- login usa `matricula` e `senha`
-- cadastro normaliza `email` e `matricula`
-- login gera JWT com `sub`, `nome`, `matricula` e `tipoUsuario`
-- cookie de sessao e enviado com `HttpOnly` e `SameSite=Lax`
-- `/home` redireciona para `/login` sem autenticacao
-- `/api/portal/cards` responde `401` sem autenticacao
-
-## Testes automatizados
-
-Rode:
-
-```powershell
-npm test
-```
-
-A suite cobre:
-
-- validacao de CPF e cadastro
-- validacao de login
-- descoberta e aplicacao das migrations pendentes
-- seed inicial com hash bcrypt do usuario administrador
-- cadastro com envio correto dos campos ao backend
-- emissao de cookie `HttpOnly`
-- geracao de JWT no login
-- protecao da home
-- protecao da API interna do portal
-
-## Observacoes
-
-- Nao ha necessidade de CORS nesta primeira versao porque frontend e backend rodam na mesma origem.
-- Se o PostgreSQL estiver ativo e o `.env` correto, o fluxo completo funciona sem Docker.
-- O arquivo `.env` continua fora do versionamento e o `.gitignore` cobre variacoes locais comuns.
-- Em bancos antigos inicializados por `database/init.sql`, rode `npm run db:migrate` antes do deploy para registrar e complementar estruturas faltantes.
-
-## Observacoes de seguranca
-
-- Existe atualmente um finding moderado transitivo reportado pelo `npm audit` em `uuid@8.3.2`, trazido por `exceljs@4.4.0`.
-- Esse caso esta documentado em `docs/decisions/001-exceljs-audit.md` e permanece monitorado.
-- Nao use `npm audit fix --force` sem analise, porque a sugestao atual tenta fazer downgrade do `exceljs` e pode quebrar a exportacao `.xlsx`.
+https://github.com/williamjadson86-lgtm/portal-logistica
